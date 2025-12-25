@@ -37,7 +37,14 @@ export const endpoints = {
   health: () => apiGet<Health>("/api/health"),
   meta: () => apiGet<Meta>("/api/meta"),
   anlas: () => apiGet<Anlas>("/api/anlas"),
-  outputs: () => apiGet<OutputsResponse>("/api/outputs"),
+  outputs: (params?: { offset?: number; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.offset != null) search.set("offset", String(params.offset));
+    if (params?.limit != null) search.set("limit", String(params.limit));
+    const query = search.toString();
+    const suffix = query ? `?${query}` : "";
+    return apiGet<OutputsResponse>(`/api/outputs${suffix}`);
+  },
   outputsDelete: (req: OutputsDeleteRequest) =>
     apiPost<OutputsDeleteRequest, OutputsDeleteResponse>(
       "/api/outputs/delete",

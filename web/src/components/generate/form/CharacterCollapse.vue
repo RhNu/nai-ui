@@ -62,7 +62,7 @@ const characters = computed(
                   <span>正向（角色）</span>
                   <textarea
                     v-model="c.prompt"
-                    class="textarea textarea-bordered h-26 w-full"
+                    class="textarea textarea-bordered h-28 w-full"
                     placeholder="character positive prompt"
                     :disabled="!c.enabled"
                   />
@@ -72,7 +72,7 @@ const characters = computed(
                   <span>反向（角色）</span>
                   <textarea
                     v-model="c.uc"
-                    class="textarea textarea-bordered h-20 w-full"
+                    class="textarea textarea-bordered h-28 w-full"
                     placeholder="character negative prompt"
                     :disabled="!c.enabled"
                   />

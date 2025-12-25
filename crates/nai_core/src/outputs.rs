@@ -138,14 +138,18 @@ impl OutputStore {
         Ok(out)
     }
 
-    pub async fn list_items(&self, limit: usize) -> Result<Vec<OutputItem>, OutputError> {
+    pub async fn list_items_paginated(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<(Vec<OutputItem>, bool, usize), OutputError> {
         let root = self.output_dir.clone();
         let items = tokio::task::spawn_blocking(move || -> Result<Vec<OutputItem>, OutputError> {
             let mut rels = Vec::new();
             if !root.exists() {
                 return Ok(Vec::new());
             }
-            walk_pngs(&root, &root, &mut rels, limit)?;
+            walk_pngs(&root, &root, &mut rels, usize::MAX)?;
             let mut items: Vec<OutputItem> =
                 rels.into_iter().map(|p| output_item_from_rel(&p)).collect();
 
@@ -162,7 +166,11 @@ impl OutputStore {
         })
         .await
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))??;
-        Ok(items)
+        let total = items.len();
+        let sliced: Vec<OutputItem> = items.into_iter().skip(offset).take(limit).collect();
+        let next_offset = offset + sliced.len();
+        let has_more = next_offset < total;
+        Ok((sliced, has_more, next_offset))
     }
 
     pub async fn delete_rel_files(&self, rel_paths: &[String]) -> Result<usize, OutputError> {

@@ -6,11 +6,10 @@ import type { CharacterPrompt, PromptPreset } from "@/api/types";
 import PromptFields from "../form/PromptFields.vue";
 import CharacterCollapse from "../form/CharacterCollapse.vue";
 
-const DEFAULT_NAME = "默认";
 const metaStore = useMetaStore();
 
-const presetName = ref<string>(DEFAULT_NAME);
-const presetNames = ref<string[]>([DEFAULT_NAME]);
+const presetName = ref<string>("");
+const presetNames = ref<string[]>([]);
 const busy = ref(false);
 
 const form = reactive({
@@ -68,18 +67,25 @@ async function refreshNames() {
   try {
     const r = await endpoints.promptPresetsList();
     const names = (r.names ?? []).slice();
-    if (!names.includes(DEFAULT_NAME)) names.unshift(DEFAULT_NAME);
-    presetNames.value = names.length ? names : [DEFAULT_NAME];
+    presetNames.value = names;
+
+    // If current选项无效，回退到第一个有效名称。
+    if (!names.includes(presetName.value)) {
+      presetName.value = names[0] ?? "";
+    }
   } catch {
-    presetNames.value = [DEFAULT_NAME];
+    presetNames.value = [];
   }
 }
 
-async function loadSelected() {
-  const name = presetName.value.trim() || DEFAULT_NAME;
+async function loadSelected(skipRefresh = false) {
+  const name = presetName.value.trim();
+  if (!name) return;
   busy.value = true;
   try {
-    await refreshNames();
+    if (!skipRefresh) {
+      await refreshNames();
+    }
     const r = await endpoints.promptPresetGet(name);
     if (r.preset) fromPreset(r.preset);
   } finally {
@@ -88,7 +94,11 @@ async function loadSelected() {
 }
 
 async function save() {
-  const name = presetName.value.trim() || DEFAULT_NAME;
+  const name = presetName.value.trim();
+  if (!name) {
+    alert("请输入预设名");
+    return;
+  }
   busy.value = true;
   try {
     await endpoints.promptPresetPut({ name, preset: toPreset() });
@@ -100,8 +110,8 @@ async function save() {
 }
 
 async function rename() {
-  const from = presetName.value.trim() || DEFAULT_NAME;
-  if (from === DEFAULT_NAME) return;
+  const from = presetName.value.trim();
+  if (!from) return;
   const to = prompt("新预设名：", from)?.trim();
   if (!to || to === from) return;
   busy.value = true;
@@ -115,14 +125,15 @@ async function rename() {
 }
 
 async function remove() {
-  const name = presetName.value.trim() || DEFAULT_NAME;
-  if (name === DEFAULT_NAME) return;
+  const name = presetName.value.trim();
+  if (!name) return;
   if (!confirm(`确定删除提示词预设：${name}？`)) return;
   busy.value = true;
   try {
     await endpoints.promptPresetDelete(name);
-    presetName.value = DEFAULT_NAME;
     await refreshNames();
+    presetName.value = presetNames.value[0] ?? "";
+    await loadSelected(true);
   } finally {
     busy.value = false;
   }
@@ -135,27 +146,30 @@ async function ensureMeta() {
 }
 
 void ensureMeta();
-void refreshNames();
-void loadSelected();
+void refreshNames().then(() => loadSelected(true));
 </script>
 
 <template>
   <div class="grid gap-4">
     <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
-      <label class="form-control items-start lg:col-span-2">
-        <div class="label"><span class="label-text">预设名</span></div>
+      <fieldset class="fieldset lg:col-span-2">
+        <legend class="fieldset-legend">预设名</legend>
         <div class="join w-full">
           <input
             v-model="presetName"
             class="input input-bordered join-item w-full"
-            :disabled="busy"
             list="promptPresetNames"
-            placeholder="默认"
+            placeholder="输入或选择预设名"
+            :disabled="busy"
           />
+
+          <datalist id="promptPresetNames">
+            <option v-for="n in presetNames" :key="n" :value="n" />
+          </datalist>
           <button
             class="btn join-item"
             type="button"
-            :class="{ 'btn-disabled': busy }"
+            :class="{ 'btn-disabled': busy || !presetName.trim() }"
             @click="save"
           >
             保存/更新
@@ -164,7 +178,7 @@ void loadSelected();
             class="btn join-item"
             type="button"
             :class="{
-              'btn-disabled': busy || presetName.trim() === DEFAULT_NAME,
+              'btn-disabled': busy || !presetName.trim(),
             }"
             @click="rename"
           >
@@ -174,40 +188,34 @@ void loadSelected();
             class="btn btn-error join-item"
             type="button"
             :class="{
-              'btn-disabled': busy || presetName.trim() === DEFAULT_NAME,
+              'btn-disabled': busy || !presetName.trim(),
             }"
             @click="remove"
           >
             删除
           </button>
+          <button
+            class="btn"
+            type="button"
+            :class="{ 'btn-disabled': busy }"
+            @click="refreshNames"
+          >
+            刷新列表
+          </button>
+          <button
+            class="btn"
+            type="button"
+            :class="{ 'btn-disabled': busy }"
+            @click="loadSelected()"
+          >
+            重载当前
+          </button>
         </div>
-        <datalist id="promptPresetNames">
-          <option v-for="n in presetNames" :key="n" :value="n" />
-        </datalist>
         <div class="label">
           <span class="label-text-alt">此处只编辑提示词预设字段子集</span>
           <span v-if="busy" class="label-text-alt">加载中…</span>
         </div>
-      </label>
-
-      <div class="form-control items-start gap-2">
-        <button
-          class="btn"
-          type="button"
-          :class="{ 'btn-disabled': busy }"
-          @click="refreshNames"
-        >
-          刷新列表
-        </button>
-        <button
-          class="btn"
-          type="button"
-          :class="{ 'btn-disabled': busy }"
-          @click="loadSelected"
-        >
-          重载当前
-        </button>
-      </div>
+      </fieldset>
     </div>
 
     <div class="divider">字段</div>
@@ -215,27 +223,27 @@ void loadSelected();
     <PromptFields :form="(form as any)" />
 
     <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
-      <label class="form-control items-start">
-        <div class="label">
-          <span class="label-text">add_quality_tags</span>
-        </div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">
+          添加质量提示词(add_quality_tags)
+        </legend>
         <select v-model="addQualityMode" class="select select-bordered w-full">
           <option value="inherit">继承（null）</option>
-          <option value="true">true</option>
-          <option value="false">false</option>
+          <option value="true">是</option>
+          <option value="false">否</option>
         </select>
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start lg:col-span-2">
-        <div class="label">
-          <span class="label-text">undesired_content_preset</span>
-        </div>
+      <fieldset class="fieldset lg:col-span-2">
+        <legend class="fieldset-legend">
+          负面提示词预设(undesired_content_preset)
+        </legend>
         <select v-model="ucPresetMode" class="select select-bordered w-full">
           <option v-for="u in ucOptions" :key="u" :value="u">
             {{ u === "inherit" ? "继承（null）" : u }}
           </option>
         </select>
-      </label>
+      </fieldset>
     </div>
 
     <CharacterCollapse

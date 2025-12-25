@@ -45,6 +45,10 @@ function persistPollingSettings(settings: StoredPollingSettings) {
 export type TrackedJob = {
   id: string;
   kind: string;
+  created_at_ms?: number;
+  started_at_ms?: number | null;
+  finished_at_ms?: number | null;
+  updated_at_ms?: number;
   status?: JobStatus;
   lastError?: string;
 };
@@ -56,29 +60,9 @@ export const useJobsStore = defineStore("jobs", () => {
   const pollingEnabled = ref(initialSettings.enabled);
   const pollingIntervalMs = ref(initialSettings.intervalMs);
 
-  // 需求：清除已完成/失败不是立即清除，而是在“下一次刷新任务”时再清。
-  const pruneOnNextRefresh = ref(false);
-
   const sorted = computed(() => jobs.value.slice().reverse());
 
-  function isTerminal(status?: JobStatus): boolean {
-    if (!status) return false;
-    return (
-      status.status === "succeeded" ||
-      status.status === "failed" ||
-      status.status === "cancelled"
-    );
-  }
-
-  function pruneTerminalJobs() {
-    jobs.value = jobs.value.filter(
-      (j) => j.kind === "manual" || !isTerminal(j.status)
-    );
-  }
-
   function track(id: string, kind: string) {
-    // 提交任务时不立刻清除历史终态；下一次 refreshAll 再清。
-    pruneOnNextRefresh.value = true;
     if (jobs.value.some((j) => j.id === id)) return;
     jobs.value.push({ id, kind });
   }
@@ -96,41 +80,24 @@ export const useJobsStore = defineStore("jobs", () => {
 
   async function refreshAll() {
     try {
-      const prev = new Map(jobs.value.map((j) => [j.id, j] as const));
       const list = await endpoints.jobsList();
-
-      const next: TrackedJob[] = list.items.map((it) => {
+      const prev = new Map(jobs.value.map((j) => [j.id, j] as const));
+      jobs.value = list.items.map((it) => {
         const old = prev.get(it.id);
         return {
           id: it.id,
           kind: it.kind,
+          created_at_ms: it.created_at_ms,
+          started_at_ms: it.started_at_ms,
+          finished_at_ms: it.finished_at_ms,
+          updated_at_ms: it.updated_at_ms,
           status: it.status,
           lastError: old?.lastError,
         };
       });
-
-      // Keep any locally-tracked ids that the backend no longer knows about
-      // (e.g. backend restarted, or manual ids).
-      for (const j of jobs.value) {
-        if (!list.items.some((it) => it.id === j.id)) {
-          next.push(j);
-        }
-      }
-
-      jobs.value = next;
-
-      if (pruneOnNextRefresh.value) {
-        pruneOnNextRefresh.value = false;
-        pruneTerminalJobs();
-      }
     } catch (e) {
       // Fallback: refresh known ids one-by-one.
       await Promise.all(jobs.value.map((j) => refresh(j.id)));
-
-      if (pruneOnNextRefresh.value) {
-        pruneOnNextRefresh.value = false;
-        pruneTerminalJobs();
-      }
     }
   }
 

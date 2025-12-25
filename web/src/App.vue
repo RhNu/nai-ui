@@ -24,11 +24,14 @@ const navLinks = [
   { label: "输出", to: "/outputs", icon: "fa-images" },
 ];
 
-const themeText = computed(() => (theme.theme === "dark" ? "暗" : "亮"));
+const themeIcon = computed(() => ({
+  "fa-solid": true,
+  "fa-moon": theme.theme === "dark",
+  "fa-sun": theme.theme !== "dark",
+}));
 
 function isActive(link: { to: string; match?: string }) {
-  const key = link.match ?? link.to;
-  return route.path.startsWith(key);
+  return route.path.startsWith(link.match ?? link.to);
 }
 
 onMounted(() => {
@@ -54,10 +57,7 @@ onMounted(() => {
             >
               NAI
             </span>
-            <div class="leading-tight">
-              <div>NovelAI UI</div>
-              <div class="text-xs opacity-70">frontend</div>
-            </div>
+            <div class="leading-tight">NovelAI UI</div>
           </RouterLink>
 
           <nav
@@ -78,7 +78,7 @@ onMounted(() => {
               type="button"
               @click="theme.toggle()"
             >
-              模式：{{ themeText }}
+              <i :class="themeIcon" />
             </button>
           </nav>
 
@@ -101,14 +101,14 @@ onMounted(() => {
                       v-if="link.icon"
                       class="fa-solid mr-2"
                       :class="link.icon"
-                    ></i>
+                    />
                     {{ link.label }}
                   </RouterLink>
                 </li>
                 <li class="mt-1 border-t border-base-200" />
                 <li>
                   <button type="button" @click="theme.toggle()">
-                    切换模式（{{ themeText }}）
+                    <i :class="themeIcon" />
                   </button>
                 </li>
               </ul>

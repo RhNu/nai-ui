@@ -3,32 +3,34 @@ import { ref, watch } from "vue";
 import { endpoints } from "@/api/endpoints";
 import type { GeneratePreset } from "@/api/types";
 
-const DEFAULT_PRESET_NAME = "默认";
-
 const props = defineProps<{
   model: string;
   onApplyPresetToForm: (model: string, p: GeneratePreset) => void;
   onApplyDefaultsForModel: (model: string) => void;
 }>();
 
-const presetName = ref<string>(DEFAULT_PRESET_NAME);
-const presetNames = ref<string[]>([DEFAULT_PRESET_NAME]);
+const presetName = ref<string>("");
+const presetNames = ref<string[]>([]);
 const presetBusy = ref(false);
 
 async function refreshPresetNames() {
   try {
     const r = await endpoints.presetsList(props.model);
     const names = (r.names ?? []).slice();
-    if (!names.includes(DEFAULT_PRESET_NAME))
-      names.unshift(DEFAULT_PRESET_NAME);
-    presetNames.value = names.length ? names : [DEFAULT_PRESET_NAME];
+    presetNames.value = names;
+
+    if (!names.includes(presetName.value)) {
+      presetName.value = names[0] ?? "";
+    }
   } catch {
-    presetNames.value = [DEFAULT_PRESET_NAME];
+    presetNames.value = [];
+    presetName.value = "";
   }
 }
 
 async function applySelectedPreset() {
-  const name = (presetName.value || "").trim() || DEFAULT_PRESET_NAME;
+  const name = (presetName.value || "").trim() || presetNames.value[0] || "";
+  if (!name) return;
   presetBusy.value = true;
   try {
     const r = await endpoints.presetGet(props.model, name);
@@ -47,7 +49,7 @@ async function applySelectedPreset() {
 watch(
   () => props.model,
   () => {
-    presetName.value = DEFAULT_PRESET_NAME;
+    presetName.value = "";
     void refreshPresetNames();
   },
   { immediate: true }
@@ -66,7 +68,7 @@ watch(
         <button
           class="btn btn-primary btn-sm"
           type="button"
-          :class="{ 'btn-disabled': presetBusy }"
+          :class="{ 'btn-disabled': presetBusy || !presetName.trim() }"
           @click="applySelectedPreset"
         >
           应用

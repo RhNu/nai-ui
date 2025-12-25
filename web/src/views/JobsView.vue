@@ -4,32 +4,47 @@ import { RouterLink } from "vue-router";
 import PageShell from "@/components/layout/PageShell.vue";
 import { useJobsStore } from "@/stores/jobs";
 
+type JobTiming = {
+  queueMs: number;
+  runMs: number;
+  totalMs: number;
+  finished: boolean;
+};
+
 const jobs = useJobsStore();
 
-const manualId = ref("");
 const intervalSeconds = ref(jobs.pollingIntervalMs / 1000);
 const pollingProgress = ref(0);
 
 let pollTimer: number | undefined;
 let progressRaf: number | undefined;
 let nextRefreshAt: number | null = null;
+const nowMs = ref(Date.now());
+let nowTimer: number | undefined;
 
 const pollingEnabled = computed({
   get: () => jobs.pollingEnabled,
   set: (value: boolean) => jobs.setPollingEnabled(value),
 });
 
+const jobTimings = computed<Map<string, JobTiming>>(() => {
+  const map = new Map<string, JobTiming>();
+  for (const j of jobs.sorted) {
+    const created = j.created_at_ms;
+    if (created == null) continue;
+    const start = j.started_at_ms ?? created;
+    const end = j.finished_at_ms ?? nowMs.value;
+    const queueMs = Math.max(0, start - created);
+    const runMs = Math.max(0, end - start);
+    const totalMs = Math.max(0, end - created);
+    map.set(j.id, { queueMs, runMs, totalMs, finished: !!j.finished_at_ms });
+  }
+  return map;
+});
+
 async function refreshAll() {
   await jobs.refreshAll();
 }
-
-function trackManual() {
-  const id = manualId.value.trim();
-  if (!id) return;
-  jobs.track(id, "manual");
-  manualId.value = "";
-}
-
 function stopProgressLoop() {
   if (progressRaf) {
     window.cancelAnimationFrame(progressRaf);
@@ -69,6 +84,20 @@ function stopPollingTimers() {
   stopProgressLoop();
 }
 
+function stopNowTicker() {
+  if (nowTimer) {
+    window.clearInterval(nowTimer);
+    nowTimer = undefined;
+  }
+}
+
+function startNowTicker() {
+  stopNowTicker();
+  nowTimer = window.setInterval(() => {
+    nowMs.value = Date.now();
+  }, 1000);
+}
+
 function schedulePolling(runImmediateRefresh: boolean) {
   stopPollingTimers();
   if (!jobs.pollingEnabled) return;
@@ -104,6 +133,18 @@ function applyInterval() {
   jobs.setPollingIntervalMs(ms);
 }
 
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts: string[] = [];
+  if (hours) parts.push(`${hours}小时`);
+  if (minutes) parts.push(`${minutes}分`);
+  parts.push(`${seconds}秒`);
+  return parts.join(" ");
+}
+
 watch(
   () => jobs.pollingIntervalMs,
   (ms) => {
@@ -124,14 +165,15 @@ watch(
 );
 
 onMounted(() => {
+  startNowTicker();
   void refreshAll();
   if (jobs.pollingEnabled) {
     schedulePolling(false);
   }
 });
-
 onUnmounted(() => {
   stopPollingTimers();
+  stopNowTicker();
 });
 </script>
 
@@ -153,27 +195,28 @@ onUnmounted(() => {
           />
         </label>
 
-        <div class="join">
-          <input
-            v-model.number="intervalSeconds"
-            type="number"
-            min="0.5"
-            step="0.5"
-            class="input input-bordered join-item w-24"
-            aria-label="轮询间隔（秒）"
-          />
-          <span class="btn btn-ghost btn-sm join-item no-animation">秒</span>
+        <fieldset class="fieldset w-auto flex items-center join">
+          <label class="input h-8">
+            <input
+              v-model.number="intervalSeconds"
+              type="number"
+              min="0.5"
+              step="0.5"
+              class="w-12"
+              aria-label="轮询间隔（秒）"
+            />
+            <span>秒</span>
+          </label>
           <button
             class="btn btn-outline btn-sm join-item"
             @click="applyInterval"
           >
             应用
           </button>
-        </div>
-
-        <button class="btn btn-primary btn-sm" @click="refreshNow">
-          {{ pollingEnabled ? "立即刷新" : "手动查询" }}
-        </button>
+          <button class="btn btn-primary btn-sm" @click="refreshNow">
+            {{ pollingEnabled ? "立即刷新" : "手动查询" }}
+          </button>
+        </fieldset>
       </div>
     </template>
 
@@ -207,15 +250,6 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="join">
-        <input
-          v-model="manualId"
-          class="input input-bordered join-item w-full"
-          placeholder="输入 job id 以追踪"
-        />
-        <button class="btn join-item" @click="trackManual">添加</button>
-      </div>
-
       <div v-if="!jobs.sorted.length" class="text-sm opacity-70">
         暂无任务（在生成页面点“提交任务”）
       </div>
@@ -235,6 +269,24 @@ onUnmounted(() => {
           <span>{{ j.status?.status ?? "unknown" }}</span>
         </div>
 
+        <div
+          v-if="jobTimings.get(j.id)"
+          class="mt-2 flex flex-wrap gap-3 text-xs opacity-80"
+        >
+          <span>
+            排队 {{ formatDuration(jobTimings.get(j.id)?.queueMs ?? 0) }}
+          </span>
+          <span>
+            运行 {{ formatDuration(jobTimings.get(j.id)?.runMs ?? 0) }}
+          </span>
+          <span v-if="jobTimings.get(j.id)?.finished">
+            总计 {{ formatDuration(jobTimings.get(j.id)?.totalMs ?? 0) }}
+          </span>
+          <span v-else>
+            累计 {{ formatDuration(jobTimings.get(j.id)?.totalMs ?? 0) }}
+          </span>
+        </div>
+
         <div v-if="j.lastError" class="mt-2 alert alert-error">
           <span>{{ j.lastError }}</span>
         </div>
@@ -252,10 +304,6 @@ onUnmounted(() => {
           </div>
           <RouterLink class="btn btn-sm" to="/outputs">打开输出</RouterLink>
         </div>
-      </div>
-
-      <div class="alert alert-info">
-        <span>根据上方设置自动轮询，或关闭后手动查询任务状态。</span>
       </div>
     </div>
   </PageShell>

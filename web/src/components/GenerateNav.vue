@@ -20,7 +20,7 @@ function isActive(path: string) {
         :class="{ 'tab-active shadow': isActive('/generate/t2i') }"
         to="/generate/t2i"
       >
-        Text to Image
+        文生图
       </RouterLink>
       <RouterLink
         role="tab"
@@ -28,7 +28,7 @@ function isActive(path: string) {
         :class="{ 'tab-active shadow': isActive('/generate/i2i') }"
         to="/generate/i2i"
       >
-        Image to Image
+        图生图
       </RouterLink>
       <RouterLink
         role="tab"
@@ -36,7 +36,7 @@ function isActive(path: string) {
         :class="{ 'tab-active shadow': isActive('/generate/inpaint') }"
         to="/generate/inpaint"
       >
-        Inpaint
+        重绘
       </RouterLink>
       <RouterLink
         role="tab"
@@ -44,7 +44,7 @@ function isActive(path: string) {
         :class="{ 'tab-active shadow': isActive('/generate/character') }"
         to="/generate/character"
       >
-        Character
+        角色
       </RouterLink>
     </div>
   </div>

@@ -150,6 +150,9 @@ void refreshNames();
             placeholder="选择后加载编辑"
             :disabled="busy"
           />
+          <datalist id="characterPresetNames">
+            <option v-for="n in presetNames" :key="n" :value="n" />
+          </datalist>
           <button
             class="btn join-item"
             type="button"
@@ -166,30 +169,24 @@ void refreshNames();
           >
             刷新
           </button>
+          <button
+            class="btn"
+            type="button"
+            :class="{ 'btn-disabled': busy || !selected.trim() }"
+            @click="rename"
+          >
+            重命名
+          </button>
+          <button
+            class="btn btn-error"
+            type="button"
+            :class="{ 'btn-disabled': busy || !selected.trim() }"
+            @click="remove"
+          >
+            删除
+          </button>
         </div>
-        <datalist id="characterPresetNames">
-          <option v-for="n in presetNames" :key="n" :value="n" />
-        </datalist>
       </label>
-
-      <div class="form-control items-start gap-2">
-        <button
-          class="btn"
-          type="button"
-          :class="{ 'btn-disabled': busy || !selected.trim() }"
-          @click="rename"
-        >
-          重命名
-        </button>
-        <button
-          class="btn btn-error"
-          type="button"
-          :class="{ 'btn-disabled': busy || !selected.trim() }"
-          @click="remove"
-        >
-          删除
-        </button>
-      </div>
     </div>
 
     <div class="divider">字段</div>
@@ -228,23 +225,23 @@ void refreshNames();
         </div>
       </label>
 
-      <label class="form-control items-start lg:col-span-3">
-        <div class="label"><span class="label-text">正向（角色）</span></div>
+      <fieldset class="fieldset lg:col-span-3">
+        <legend class="fieldset-legend">正向（角色）</legend>
         <textarea
           v-model="working.prompt"
-          class="textarea textarea-bordered h-24 w-full"
+          class="textarea textarea-bordered h-28 w-full"
           :disabled="busy"
         />
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start lg:col-span-3">
-        <div class="label"><span class="label-text">反向（角色）</span></div>
+      <fieldset class="fieldset lg:col-span-3">
+        <legend class="fieldset-legend">反向（角色）</legend>
         <textarea
           v-model="working.uc"
-          class="textarea textarea-bordered h-24 w-full"
+          class="textarea textarea-bordered h-28 w-full"
           :disabled="busy"
         />
-      </label>
+      </fieldset>
     </div>
 
     <div class="text-xs opacity-70">

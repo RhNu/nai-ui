@@ -4,12 +4,11 @@ import { endpoints } from "@/api/endpoints";
 import { useMetaStore } from "@/stores/meta";
 import type { GeneratePreset } from "@/api/types";
 
-const DEFAULT_PRESET_NAME = "默认";
 const metaStore = useMetaStore();
 
 const model = ref<string>("nai-diffusion-4-5-full");
-const presetName = ref<string>(DEFAULT_PRESET_NAME);
-const presetNames = ref<string[]>([DEFAULT_PRESET_NAME]);
+const presetName = ref<string>("");
+const presetNames = ref<string[]>([]);
 const busy = ref(false);
 
 const isV3Model = computed(
@@ -24,7 +23,7 @@ const preset = reactive<GeneratePreset>({
   steps: 27,
   scale: 5,
   sampler: "k_euler_ancestral",
-  noise_schedule: null as any,
+  noise_schedule: "karras",
   cfg_rescale: null as any,
   seed: -1,
   add_quality_tags: true,
@@ -63,19 +62,25 @@ async function refreshNames() {
   try {
     const r = await endpoints.presetsList(model.value);
     const names = (r.names ?? []).slice();
-    if (!names.includes(DEFAULT_PRESET_NAME))
-      names.unshift(DEFAULT_PRESET_NAME);
-    presetNames.value = names.length ? names : [DEFAULT_PRESET_NAME];
+    presetNames.value = names;
+
+    if (!names.includes(presetName.value)) {
+      presetName.value = names[0] ?? "";
+    }
   } catch {
-    presetNames.value = [DEFAULT_PRESET_NAME];
+    presetNames.value = [];
+    presetName.value = "";
   }
 }
 
 async function loadSelected() {
-  const name = presetName.value.trim() || DEFAULT_PRESET_NAME;
+  const name = presetName.value.trim() || presetNames.value[0] || "";
+  if (!name) {
+    applyDefaultsForModel(model.value);
+    return;
+  }
   busy.value = true;
   try {
-    await refreshNames();
     const r = await endpoints.presetGet(model.value, name);
     if (!r.preset) {
       applyDefaultsForModel(model.value);
@@ -92,7 +97,11 @@ async function loadSelected() {
 }
 
 async function save() {
-  const name = presetName.value.trim() || DEFAULT_PRESET_NAME;
+  const name = presetName.value.trim();
+  if (!name) {
+    alert("请输入预设名");
+    return;
+  }
   busy.value = true;
   try {
     await endpoints.presetPut({
@@ -108,8 +117,8 @@ async function save() {
 }
 
 async function rename() {
-  const from = presetName.value.trim() || DEFAULT_PRESET_NAME;
-  if (from === DEFAULT_PRESET_NAME) return;
+  const from = presetName.value.trim();
+  if (!from) return;
   const to = prompt("新预设名：", from)?.trim();
   if (!to || to === from) return;
   busy.value = true;
@@ -123,14 +132,14 @@ async function rename() {
 }
 
 async function remove() {
-  const name = presetName.value.trim() || DEFAULT_PRESET_NAME;
-  if (name === DEFAULT_PRESET_NAME) return;
+  const name = presetName.value.trim();
+  if (!name) return;
   if (!confirm(`确定删除预设：${name}？`)) return;
   busy.value = true;
   try {
     await endpoints.presetDelete(model.value, name);
-    presetName.value = DEFAULT_PRESET_NAME;
     await refreshNames();
+    presetName.value = presetNames.value[0] ?? "";
     await loadSelected();
   } finally {
     busy.value = false;
@@ -140,7 +149,7 @@ async function remove() {
 watch(
   () => model.value,
   () => {
-    presetName.value = DEFAULT_PRESET_NAME;
+    presetName.value = "";
     applyDefaultsForModel(model.value);
     void refreshNames();
   },
@@ -168,29 +177,29 @@ void ensureMeta();
 <template>
   <div class="grid gap-4">
     <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">模型</span></div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">模型</legend>
         <select v-model="model" class="select select-bordered w-full">
           <option v-for="m in metaStore.models" :key="m" :value="m">
             {{ m }}
           </option>
         </select>
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start lg:col-span-2">
-        <div class="label"><span class="label-text">预设名</span></div>
+      <fieldset class="fieldset lg:col-span-2">
+        <legend class="fieldset-legend">预设名</legend>
         <div class="join w-full">
           <input
             v-model="presetName"
             class="input input-bordered join-item w-full"
             :disabled="busy"
             list="managePresetNames"
-            placeholder="默认"
+            placeholder="输入或选择预设名"
           />
           <button
             class="btn join-item"
             type="button"
-            :class="{ 'btn-disabled': busy }"
+            :class="{ 'btn-disabled': busy || !presetName.trim() }"
             @click="save"
           >
             保存
@@ -199,7 +208,7 @@ void ensureMeta();
             class="btn join-item"
             type="button"
             :class="{
-              'btn-disabled': busy || presetName.trim() === DEFAULT_PRESET_NAME,
+              'btn-disabled': busy || !presetName.trim(),
             }"
             @click="rename"
           >
@@ -209,7 +218,7 @@ void ensureMeta();
             class="btn btn-error join-item"
             type="button"
             :class="{
-              'btn-disabled': busy || presetName.trim() === DEFAULT_PRESET_NAME,
+              'btn-disabled': busy || !presetName.trim(),
             }"
             @click="remove"
           >
@@ -220,27 +229,27 @@ void ensureMeta();
           <option v-for="n in presetNames" :key="n" :value="n" />
         </datalist>
         <div class="label">
-          <span class="label-text-alt">此处只编辑“生成预设”字段子集</span>
+          <span class="label-text-alt">此处编辑“生成预设”字段子集</span>
           <span v-if="busy" class="label-text-alt">加载中…</span>
         </div>
-      </label>
+      </fieldset>
     </div>
 
     <div class="divider">预设字段</div>
 
     <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">张数</span></div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">张数</legend>
         <input
           v-model.number="preset.quantity"
           type="number"
           min="1"
           class="input input-bordered w-full"
         />
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">宽</span></div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">宽</legend>
         <input
           v-model.number="preset.width"
           type="number"
@@ -248,10 +257,10 @@ void ensureMeta();
           step="64"
           class="input input-bordered w-full"
         />
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">高</span></div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">高</legend>
         <input
           v-model.number="preset.height"
           type="number"
@@ -259,20 +268,20 @@ void ensureMeta();
           step="64"
           class="input input-bordered w-full"
         />
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">Steps</span></div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Steps</legend>
         <input
           v-model.number="preset.steps"
           type="number"
           min="1"
           class="input input-bordered w-full"
         />
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">Scale</span></div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Scale</legend>
         <input
           v-model.number="preset.scale"
           type="number"
@@ -280,48 +289,49 @@ void ensureMeta();
           step="0.1"
           class="input input-bordered w-full"
         />
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">Sampler</span></div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Sampler</legend>
         <select v-model="preset.sampler" class="select select-bordered w-full">
           <option v-for="s in metaStore.samplers" :key="s" :value="s">
             {{ s }}
           </option>
         </select>
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">Noise schedule</span></div>
-        <input
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Noise schedule</legend>
+        <select
           v-model="preset.noise_schedule"
-          class="input input-bordered w-full"
-          placeholder="null / value"
-        />
-      </label>
+          class="select select-bordered w-full"
+        >
+          <option v-for="u in metaStore.noiseSchedules" :key="u" :value="u">
+            {{ u }}
+          </option>
+        </select>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">CFG rescale</span></div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">CFG rescale</legend>
         <input
           v-model="preset.cfg_rescale"
           class="input input-bordered w-full"
           placeholder="null / value"
         />
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label"><span class="label-text">Seed</span></div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Seed</legend>
         <input
           v-model.number="preset.seed"
           type="number"
           class="input input-bordered w-full"
         />
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label">
-          <span class="label-text">Add quality tags</span>
-        </div>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Add quality tags</legend>
         <label
           class="flex items-center gap-3 rounded-lg border border-base-300/70 bg-base-100/70 px-3 py-2"
         >
@@ -334,42 +344,44 @@ void ensureMeta();
             preset.add_quality_tags ? "开启" : "关闭"
           }}</span>
         </label>
-      </label>
+      </fieldset>
 
-      <label class="form-control items-start">
-        <div class="label">
-          <span class="label-text">Undesired content</span>
-        </div>
-        <input
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Undesired content</legend>
+        <select
           v-model="preset.undesired_content_preset"
-          class="input input-bordered"
-        />
-      </label>
+          class="select select-bordered w-full"
+        >
+          <option v-for="u in metaStore.ucPresets" :key="u" :value="u">
+            {{ u }}
+          </option>
+        </select>
+      </fieldset>
 
       <template v-if="isV3Model">
-        <label class="form-control items-start">
-          <div class="label"><span class="label-text">SM</span></div>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">SM</legend>
           <label
             class="flex items-center gap-3 rounded-lg border border-base-300/70 bg-base-100/70 px-3 py-2"
           >
             <input v-model="preset.sm" type="checkbox" class="toggle" />
             <span class="text-sm">{{ preset.sm ? "开启" : "关闭" }}</span>
           </label>
-        </label>
-        <label class="form-control items-start">
-          <div class="label"><span class="label-text">SM dyn</span></div>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">SM dyn</legend>
           <label
             class="flex items-center gap-3 rounded-lg border border-base-300/70 bg-base-100/70 px-3 py-2"
           >
             <input v-model="preset.sm_dyn" type="checkbox" class="toggle" />
             <span class="text-sm">{{ preset.sm_dyn ? "开启" : "关闭" }}</span>
           </label>
-        </label>
+        </fieldset>
       </template>
 
       <template v-else>
-        <label class="form-control items-start">
-          <div class="label"><span class="label-text">Use coords</span></div>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Use coords</legend>
           <label
             class="flex items-center gap-3 rounded-lg border border-base-300/70 bg-base-100/70 px-3 py-2"
           >
@@ -378,9 +390,9 @@ void ensureMeta();
               preset.use_coords ? "开启" : "关闭"
             }}</span>
           </label>
-        </label>
-        <label class="form-control items-start">
-          <div class="label"><span class="label-text">Legacy UC</span></div>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Legacy UC</legend>
           <label
             class="flex items-center gap-3 rounded-lg border border-base-300/70 bg-base-100/70 px-3 py-2"
           >
@@ -389,7 +401,7 @@ void ensureMeta();
               preset.legacy_uc ? "开启" : "关闭"
             }}</span>
           </label>
-        </label>
+        </fieldset>
       </template>
     </div>
   </div>

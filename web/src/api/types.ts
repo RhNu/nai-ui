@@ -81,6 +81,8 @@ export type OutputItem = {
 
 export type OutputsResponse = {
   items: OutputItem[];
+  next_offset: number;
+  has_more: boolean;
 };
 
 export type OutputsDeleteRequest = {
@@ -106,6 +108,9 @@ export type JobSummary = {
   id: string;
   kind: string;
   created_at_ms: number;
+  started_at_ms: number | null;
+  finished_at_ms: number | null;
+  updated_at_ms: number;
   status: JobStatus;
 };
 

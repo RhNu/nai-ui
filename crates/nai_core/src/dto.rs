@@ -123,6 +123,8 @@ pub struct OutputItem {
 #[derive(Debug, Serialize)]
 pub struct OutputsListResponse {
     pub items: Vec<OutputItem>,
+    pub next_offset: usize,
+    pub has_more: bool,
 }
 
 #[derive(Debug, Deserialize)]

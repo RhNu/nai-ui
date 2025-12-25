@@ -86,31 +86,29 @@ async function runJob(base: any) {
         class="grid gap-3 rounded-xl border border-base-300/70 bg-base-200/60 p-4"
       >
         <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <label class="form-control items-start">
-            <div class="label"><span class="label-text">原图</span></div>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">原图</legend>
             <input
               class="file-input file-input-bordered w-full"
               type="file"
               accept="image/*"
               @change="onPickImage"
             />
-          </label>
-          <label class="form-control items-start">
-            <div class="label"><span class="label-text">mask</span></div>
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">遮罩(mask)</legend>
             <input
               class="file-input file-input-bordered w-full"
               type="file"
               accept="image/*"
               @change="onPickMask"
             />
-          </label>
+          </fieldset>
         </div>
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <label class="form-control items-start">
-            <div class="label">
-              <span class="label-text">strength</span>
-            </div>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">强度(strength)</legend>
             <input
               v-model.number="strength"
               class="input input-bordered w-full"
@@ -119,9 +117,9 @@ async function runJob(base: any) {
               min="0"
               max="1"
             />
-          </label>
-          <label class="form-control items-start">
-            <div class="label"><span class="label-text">noise</span></div>
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">噪声(noise)</legend>
             <input
               v-model.number="noise"
               class="input input-bordered w-full"
@@ -130,32 +128,30 @@ async function runJob(base: any) {
               min="0"
               max="1"
             />
-          </label>
+          </fieldset>
         </div>
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <label class="form-control items-start">
-            <div class="label">
-              <span class="label-text">extra_noise_seed</span>
-            </div>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">
+              额外噪声种子(extra_noise_seed)
+            </legend>
             <input
               v-model.number="extraNoiseSeed"
               class="input input-bordered w-full"
               type="number"
               placeholder="(可选)"
             />
-          </label>
-          <label class="form-control items-start">
-            <div class="label">
-              <span class="label-text">color_correct</span>
-            </div>
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">颜色修正(color_correct)</legend>
             <label
               class="flex items-center gap-3 rounded-lg border border-base-300/70 bg-base-100/70 px-3 py-2"
             >
               <input v-model="colorCorrect" type="checkbox" class="toggle" />
               <span class="text-sm">{{ colorCorrect ? "开启" : "关闭" }}</span>
             </label>
-          </label>
+          </fieldset>
         </div>
       </div>
 
@@ -175,7 +171,7 @@ async function runJob(base: any) {
               v-if="lastJobId"
               class="rounded-full bg-base-200 px-3 py-1 text-xs font-medium"
             >
-              job id：<span class="font-mono break-all">{{ lastJobId }}</span>
+              Job ID: <span class="font-mono break-all">{{ lastJobId }}</span>
             </div>
           </div>
         </div>

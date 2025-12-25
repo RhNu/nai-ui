@@ -1,9 +1,7 @@
 services:
   nai-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: nai-ui
+    image: ghcr.io/rhnu/nai-ui:latest
     environment:
       - token=${TOKEN}
       - proxy=${PROXY:-}
@@ -14,4 +12,10 @@ services:
       - ./outputs:/data/outputs
     ports:
       - "11451:11451"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11451/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped

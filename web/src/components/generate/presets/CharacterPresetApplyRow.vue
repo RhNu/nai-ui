@@ -46,8 +46,8 @@ async function applyToSlot() {
     slotObj.prompt = r.preset.prompt;
     slotObj.uc = r.preset.uc;
     slotObj.center = r.preset.center;
-  } catch {
-    // ignore
+  } catch (error) {
+    console.warn("Failed to apply character preset", error);
   } finally {
     busy.value = false;
   }

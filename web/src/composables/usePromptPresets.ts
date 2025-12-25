@@ -12,17 +12,21 @@ export function usePromptPresets(opts: {
     enabled: CharacterPrompt[] | null | undefined
   ) => CharacterPrompt[];
 }) {
-  const promptPresetName = ref<string>("默认");
-  const promptPresetNames = ref<string[]>(["默认"]);
+  const promptPresetName = ref<string>("");
+  const promptPresetNames = ref<string[]>([]);
 
   async function refreshPromptPresetNames() {
     try {
       const resp = await endpoints.promptPresetsList();
       const names = (resp.names ?? []).slice();
-      if (!names.includes("默认")) names.unshift("默认");
-      promptPresetNames.value = names.length ? names : ["默认"];
+      promptPresetNames.value = names;
+
+      if (!names.includes(promptPresetName.value)) {
+        promptPresetName.value = names[0] ?? "";
+      }
     } catch {
-      promptPresetNames.value = ["默认"];
+      promptPresetNames.value = [];
+      promptPresetName.value = "";
     }
   }
 
@@ -52,7 +56,8 @@ export function usePromptPresets(opts: {
   }
 
   async function applyPromptPresetOnce() {
-    const name = promptPresetName.value.trim() || "默认";
+    const name = promptPresetName.value.trim();
+    if (!name) return;
     try {
       const resp = await endpoints.promptPresetGet(name);
       if (!resp.preset) return;
@@ -63,7 +68,11 @@ export function usePromptPresets(opts: {
   }
 
   async function savePromptPreset() {
-    const name = promptPresetName.value.trim() || "默认";
+    const name = promptPresetName.value.trim();
+    if (!name) {
+      alert("请输入预设名");
+      return;
+    }
     try {
       await endpoints.promptPresetPut({
         name,
@@ -77,21 +86,21 @@ export function usePromptPresets(opts: {
   }
 
   async function deletePromptPreset() {
-    const name = promptPresetName.value.trim() || "默认";
-    if (name === "默认") return;
+    const name = promptPresetName.value.trim();
+    if (!name) return;
     if (!confirm(`确定删除提示词预设：${name}？`)) return;
     try {
       await endpoints.promptPresetDelete(name);
-      promptPresetName.value = "默认";
       await refreshPromptPresetNames();
+      promptPresetName.value = promptPresetNames.value[0] ?? "";
     } catch (e: any) {
       alert(e?.message ?? String(e));
     }
   }
 
   async function renamePromptPreset() {
-    const from = promptPresetName.value.trim() || "默认";
-    if (from === "默认") return;
+    const from = promptPresetName.value.trim();
+    if (!from) return;
     const to = prompt("新预设名：", from)?.trim();
     if (!to || to === from) return;
     try {

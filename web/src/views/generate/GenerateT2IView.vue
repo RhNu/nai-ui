@@ -61,7 +61,7 @@ async function runJob(req: BaseGenerateRequest) {
               v-if="lastJobId"
               class="rounded-full bg-base-200 px-3 py-1 text-xs font-medium"
             >
-              job id：<span class="font-mono break-all">{{ lastJobId }}</span>
+              Job ID：<span class="font-mono break-all">{{ lastJobId }}</span>
             </div>
           </div>
         </div>

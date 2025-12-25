@@ -7,8 +7,6 @@ import type {
   PromptPreset,
 } from "@/api/types";
 
-const DEFAULT_NAME = "默认";
-
 const props = defineProps<{
   form: BaseGenerateRequest;
   inflateCharacterSlots: (
@@ -16,18 +14,22 @@ const props = defineProps<{
   ) => CharacterPrompt[];
 }>();
 
-const presetName = ref<string>(DEFAULT_NAME);
-const presetNames = ref<string[]>([DEFAULT_NAME]);
+const presetName = ref<string>("");
+const presetNames = ref<string[]>([]);
 const busy = ref(false);
 
 async function refreshNames() {
   try {
     const r = await endpoints.promptPresetsList();
     const names = (r.names ?? []).slice();
-    if (!names.includes(DEFAULT_NAME)) names.unshift(DEFAULT_NAME);
-    presetNames.value = names.length ? names : [DEFAULT_NAME];
+    presetNames.value = names;
+
+    if (!names.includes(presetName.value)) {
+      presetName.value = names[0] ?? "";
+    }
   } catch {
-    presetNames.value = [DEFAULT_NAME];
+    presetNames.value = [];
+    presetName.value = "";
   }
 }
 
@@ -44,7 +46,8 @@ function applyToForm(p: PromptPreset) {
 }
 
 async function applyOnce() {
-  const name = presetName.value.trim() || DEFAULT_NAME;
+  const name = presetName.value.trim();
+  if (!name) return;
   busy.value = true;
   try {
     const r = await endpoints.promptPresetGet(name);
@@ -73,7 +76,7 @@ void refreshNames();
         <button
           class="btn btn-primary btn-sm"
           type="button"
-          :class="{ 'btn-disabled': busy }"
+          :class="{ 'btn-disabled': busy || !presetName.trim() }"
           @click="applyOnce"
         >
           应用
@@ -97,7 +100,7 @@ void refreshNames();
           v-model="presetName"
           class="input input-bordered"
           list="promptPresetNames"
-          placeholder="例如：构图-风格-人物"
+          placeholder="输入或选择预设名"
           :disabled="busy"
         />
         <datalist id="promptPresetNames">

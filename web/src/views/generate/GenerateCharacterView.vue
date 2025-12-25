@@ -75,42 +75,41 @@ async function runJob(base: any) {
       <div
         class="grid gap-3 rounded-xl border border-base-300/70 bg-base-200/60 p-4"
       >
-        <label class="form-control">
-          <div class="label">
-            <span class="label-text">角色参考图</span>
-          </div>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">角色参考图</legend>
           <input
             class="file-input file-input-bordered"
             type="file"
             accept="image/*"
             @change="onPick"
           />
-        </label>
+        </fieldset>
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <label class="form-control">
-            <div class="label"><span class="label-text">style_aware</span></div>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">style_aware</legend>
             <label
               class="flex items-center gap-3 rounded-lg border border-base-300/70 bg-base-100/70 px-3 py-2"
             >
               <input v-model="styleAware" type="checkbox" class="toggle" />
               <span class="text-sm">{{ styleAware ? "开启" : "关闭" }}</span>
             </label>
-          </label>
-          <label class="form-control">
-            <div class="label">
-              <span class="label-text">fidelity</span>
-            </div>
-            <input
-              v-model.number="fidelity"
-              class="range"
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-            />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">fidelity</legend>
+            <label
+              class="flex items-center gap-3 rounded-lg border border-base-300/70 bg-base-100/70 px-3 py-2"
+              ><input
+                v-model.number="fidelity"
+                class="range"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+              />
+            </label>
             <div class="text-xs opacity-70">{{ fidelity.toFixed(2) }}</div>
-          </label>
+          </fieldset>
         </div>
       </div>
 

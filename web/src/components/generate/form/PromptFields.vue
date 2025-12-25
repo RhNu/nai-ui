@@ -20,7 +20,7 @@ const props = defineProps<{
     <legend class="fieldset-legend">反向提示词</legend>
     <textarea
       v-model="props.form.negative"
-      class="textarea textarea-bordered h-20 w-full"
+      class="textarea textarea-bordered h-28 w-full"
       placeholder="negative prompt"
     />
   </fieldset>

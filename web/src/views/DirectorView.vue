@@ -114,8 +114,8 @@ async function run() {
       <div
         class="grid gap-3 rounded-xl border border-base-300/70 bg-base-200/60 p-4"
       >
-        <label class="form-control">
-          <div class="label"><span class="label-text">模式</span></div>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">模式</legend>
           <select v-model="mode" class="select select-bordered">
             <option value="remove_bg">remove_bg (bg-removal)</option>
             <option value="line_art">line_art</option>
@@ -124,21 +124,21 @@ async function run() {
             <option value="colorize">colorize (prompt+defry)</option>
             <option value="emotion">emotion (prompt+defry)</option>
           </select>
-        </label>
+        </fieldset>
 
-        <label class="form-control">
-          <div class="label"><span class="label-text">图片</span></div>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">图片</legend>
           <input
             class="file-input file-input-bordered"
             type="file"
             accept="image/*"
             @change="onPick"
           />
-        </label>
+        </fieldset>
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <label class="form-control">
-            <div class="label"><span class="label-text">宽</span></div>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">宽</legend>
             <input
               v-model.number="width"
               class="input input-bordered"
@@ -146,9 +146,9 @@ async function run() {
               min="64"
               step="64"
             />
-          </label>
-          <label class="form-control">
-            <div class="label"><span class="label-text">高</span></div>
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">高</legend>
             <input
               v-model.number="height"
               class="input input-bordered"
@@ -156,26 +156,26 @@ async function run() {
               min="64"
               step="64"
             />
-          </label>
+          </fieldset>
         </div>
 
         <div v-if="needsPrompt" class="grid gap-3">
-          <label class="form-control">
-            <div class="label"><span class="label-text">prompt</span></div>
+          <fieldset class="fieldset w-full">
+            <legend class="fieldset-legend">prompt</legend>
             <textarea
               v-model="prompt"
-              class="textarea textarea-bordered h-24"
+              class="textarea textarea-bordered h-24 w-full"
             />
-          </label>
-          <label class="form-control">
-            <div class="label"><span class="label-text">defry</span></div>
+          </fieldset>
+          <fieldset class="fieldset w-full">
+            <legend class="fieldset-legend">defry</legend>
             <input
               v-model.number="defry"
-              class="input input-bordered"
+              class="input input-bordered w-full"
               type="number"
               step="1"
             />
-          </label>
+          </fieldset>
         </div>
 
         <button
@@ -217,7 +217,7 @@ async function run() {
         </div>
 
         <div class="alert alert-info">
-          <span>remove_bg 可能返回多张图（image_0/1/2）。</span>
+          <span>remove_bg 可能返回多张图（image_0/1/2）</span>
         </div>
       </div>
     </div>
