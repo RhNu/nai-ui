@@ -1,0 +1,22 @@
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css");
+@import "tailwindcss";
+@plugin "daisyui";
+
+@theme {
+  --font-sans: "Space Grotesk", "Noto Sans SC", "Inter", "Segoe UI", system-ui,
+    sans-serif;
+}
+
+@layer base {
+  body {
+    @apply min-h-screen bg-base-200 text-base-content font-sans antialiased;
+  }
+
+  ::selection {
+    @apply bg-primary text-primary-content;
+  }
+
+  a {
+    @apply transition-colors duration-150;
+  }
+}

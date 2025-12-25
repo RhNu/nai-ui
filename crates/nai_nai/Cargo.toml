@@ -1,0 +1,22 @@
+[package]
+name = "nai_nai"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nai_core = { path = "../nai_core" }
+
+anyhow.workspace = true
+thiserror.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+async-trait = "0.1"
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "rustls-tls",
+    "gzip",
+    "brotli",
+    "deflate",
+] }
+zip = { version = "7", default-features = false, features = ["deflate"] }

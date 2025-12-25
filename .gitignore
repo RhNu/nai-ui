@@ -1,0 +1,11 @@
+/target
+/_old
+/outputs
+/.idea
+/.vscode
+
+*.code-workspace
+run-dev.bat
+run-dev.ps1
+
+.env
