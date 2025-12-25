@@ -38,7 +38,7 @@ jobs:
           owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_APP=${{ env.REGISTRY }}/${owner}/nai-ui" >> $GITHUB_ENV
 
-      - name: Build and push (backend serves frontend)
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .

@@ -11,7 +11,7 @@ ARG VITE_BACKEND_URL=
 ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
 COPY web/package.json web/pnpm-lock.yaml web/tsconfig*.json web/vite.config.ts ./
 COPY web/src ./src
-COPY web/public ./public 2>/dev/null || true
+COPY web/public ./public
 RUN pnpm install --frozen-lockfile
 RUN pnpm build
 
