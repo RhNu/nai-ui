@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useEventListener } from "@vueuse/core";
+import { useEventListener, useIntersectionObserver } from "@vueuse/core";
 import PageShell from "@/components/layout/PageShell.vue";
 import { endpoints } from "@/api/endpoints";
 import { outputsUrl } from "@/components/urls";
@@ -20,8 +20,6 @@ const pageSize = 60;
 const openAction = ref<string | null>(null);
 const activeTab = ref("");
 const previewItem = ref<OutputItem | null>(null);
-
-let observer: IntersectionObserver | null = null;
 
 const selectedPaths = computed(() =>
   Object.entries(selected.value)
@@ -45,21 +43,21 @@ watch(categories, (cats) => {
 });
 
 function parseIndex(name: string): number {
-  const matches = name.match(/(\d{3,})/g);
-  if (!matches || !matches.length) return 0;
-  const last = matches[matches.length - 1];
-  const n = Number.parseInt(last, 10);
-  return Number.isNaN(n) ? 0 : n;
+  // 仅按文件名末尾数字排序，老格式无编号则置为 -1
+  const match = name.match(/(\d+)(?=\.[^.]+$)/);
+  if (!match) return -1;
+  const n = Number.parseInt(match[1], 10);
+  return Number.isNaN(n) ? -1 : n;
 }
 
 const tabItems = computed(() => {
   const filtered = items.value.filter(
     (it) => !activeTab.value || it.op_type === activeTab.value
   );
-  return filtered.slice().sort((a, b) => {
-    if (a.date !== b.date) return b.date.localeCompare(a.date);
-    return parseIndex(b.filename) - parseIndex(a.filename);
-  });
+  return filtered
+    .slice()
+    .sort((a, b) => parseIndex(b.filename) - parseIndex(a.filename))
+    .sort((a, b) => b.date.localeCompare(a.date));
 });
 
 const dateGroups = computed(() => {
@@ -79,26 +77,19 @@ function clearSelection() {
   openAction.value = null;
 }
 
-function disconnectObserver() {
-  if (observer) {
-    observer.disconnect();
-    observer = null;
-  }
-}
+const { stop: stopObserver } = useIntersectionObserver(
+  loadMoreEl,
+  (entries) => {
+    if (entries.some((e) => e.isIntersecting)) {
+      void loadMore();
+    }
+  },
+  { rootMargin: "300px" }
+);
 
-function connectObserver() {
-  disconnectObserver();
-  if (!loadMoreEl.value) return;
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries.some((e) => e.isIntersecting)) {
-        void loadMore();
-      }
-    },
-    { rootMargin: "300px" }
-  );
-  observer.observe(loadMoreEl.value);
-}
+onUnmounted(() => {
+  stopObserver();
+});
 
 async function loadMore(force = false) {
   if ((loading.value || loadingMore.value) && !force) return;
@@ -297,21 +288,7 @@ function toggleActions(path: string) {
   openAction.value = openAction.value === path ? null : path;
 }
 
-onMounted(() => {
-  connectObserver();
-  void refresh();
-});
-
-onUnmounted(() => {
-  disconnectObserver();
-});
-
-watch(
-  () => loadMoreEl.value,
-  () => {
-    connectObserver();
-  }
-);
+onMounted(refresh);
 
 watch(items, () => {
   if (

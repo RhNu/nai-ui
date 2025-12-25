@@ -39,9 +39,7 @@ impl OutputStore {
             load_counters_sync(&counters_path).unwrap_or_default();
 
         // 启动时扫描一下游标位置：根据已有文件名推断每个目录的 next index。
-        // 兼容两种命名：
-        // - 新：00001_xxxxxx_seed.png（编号在前）
-        // - 旧：seed_00001.png（编号在后）
+        // 仅支持新命名：00001_xxxxxx_seed.png（编号在前）
         let changed = scan_existing_outputs_sync(&output_dir, &mut counters)?;
         if changed {
             save_counters_sync(&counters_path, &counters)?;
@@ -421,7 +419,7 @@ fn scan_dir_sync(
 }
 
 fn parse_output_index(file_name: &str) -> Option<usize> {
-    // New default: 00001_xxxxxx_seed.png
+    // 新默认：00001_xxxxxx_seed.png（编号在前，5 位十进制）
     if file_name.len() >= 5 {
         let head = &file_name[..5];
         if head.chars().all(|c| c.is_ascii_digit()) {
@@ -429,25 +427,7 @@ fn parse_output_index(file_name: &str) -> Option<usize> {
         }
     }
 
-    // Old default: seed_00001.png (take the last _dddddd group of length 5)
-    let bytes = file_name.as_bytes();
-    let mut best: Option<usize> = None;
-    for i in 0..=bytes.len().saturating_sub(6) {
-        if bytes[i] != b'_' {
-            continue;
-        }
-        let slice = &file_name[i + 1..];
-        if slice.len() < 5 {
-            continue;
-        }
-        let cand = &slice[..5];
-        if cand.chars().all(|c| c.is_ascii_digit()) {
-            if let Ok(v) = cand.parse::<usize>() {
-                best = Some(best.map(|b| b.max(v)).unwrap_or(v));
-            }
-        }
-    }
-    best
+    None
 }
 
 fn walk_pngs(

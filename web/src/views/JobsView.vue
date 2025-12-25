@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useIntervalFn, useRafFn, useTimeoutFn } from "@vueuse/core";
 import { RouterLink } from "vue-router";
 import PageShell from "@/components/layout/PageShell.vue";
 import { useJobsStore } from "@/stores/jobs";
@@ -15,12 +16,11 @@ const jobs = useJobsStore();
 
 const intervalSeconds = ref(jobs.pollingIntervalMs / 1000);
 const pollingProgress = ref(0);
-
-let pollTimer: number | undefined;
-let progressRaf: number | undefined;
-let nextRefreshAt: number | null = null;
 const nowMs = ref(Date.now());
-let nowTimer: number | undefined;
+const nextRefreshAt = ref<number | null>(null);
+const pollDelay = computed(() =>
+  Math.max(500, Math.round(intervalSeconds.value * 1000))
+);
 
 const pollingEnabled = computed({
   get: () => jobs.pollingEnabled,
@@ -45,83 +45,80 @@ const jobTimings = computed<Map<string, JobTiming>>(() => {
 async function refreshAll() {
   await jobs.refreshAll();
 }
-function stopProgressLoop() {
-  if (progressRaf) {
-    window.cancelAnimationFrame(progressRaf);
-    progressRaf = undefined;
-  }
-  pollingProgress.value = 0;
-}
+const { pause: pauseNowTicker, resume: resumeNowTicker } = useIntervalFn(
+  () => {
+    nowMs.value = Date.now();
+  },
+  1000,
+  { immediate: false }
+);
 
-function startProgressLoop() {
-  stopProgressLoop();
-  const loop = () => {
-    if (!jobs.pollingEnabled || nextRefreshAt === null) {
+const { start: startPollTimeout, stop: stopPollTimeout } = useTimeoutFn(
+  async () => {
+    await refreshAll();
+    schedulePolling(false);
+  },
+  pollDelay,
+  { immediate: false }
+);
+
+const { pause: pauseProgress, resume: resumeProgress } = useRafFn(
+  () => {
+    if (!jobs.pollingEnabled || nextRefreshAt.value === null) {
       pollingProgress.value = 0;
-      progressRaf = undefined;
       return;
     }
 
-    const total = jobs.pollingIntervalMs;
-    const remaining = Math.max(0, nextRefreshAt - performance.now());
+    const total = pollDelay.value;
+    const remaining = Math.max(0, nextRefreshAt.value - performance.now());
     const elapsed = total - remaining;
     const percent =
       total <= 0 ? 100 : Math.min(100, Math.max(0, (elapsed / total) * 100));
     pollingProgress.value = percent;
-    progressRaf = window.requestAnimationFrame(loop);
-  };
+  },
+  { immediate: true }
+);
 
-  progressRaf = window.requestAnimationFrame(loop);
+function schedulePolling(runImmediateRefresh: boolean) {
+  stopPollTimeout();
+  if (!jobs.pollingEnabled) {
+    nextRefreshAt.value = null;
+    pollingProgress.value = 0;
+    pauseProgress();
+    return;
+  }
+
+  nextRefreshAt.value = performance.now() + pollDelay.value;
+  resumeProgress();
+
+  if (runImmediateRefresh) {
+    void refreshAll().finally(() => {
+      nextRefreshAt.value = performance.now() + pollDelay.value;
+      startPollTimeout();
+    });
+  } else {
+    startPollTimeout();
+  }
 }
 
 function stopPollingTimers() {
-  if (pollTimer) {
-    window.clearTimeout(pollTimer);
-    pollTimer = undefined;
-  }
-
-  nextRefreshAt = null;
-  stopProgressLoop();
-}
-
-function stopNowTicker() {
-  if (nowTimer) {
-    window.clearInterval(nowTimer);
-    nowTimer = undefined;
-  }
+  stopPollTimeout();
+  nextRefreshAt.value = null;
+  pollingProgress.value = 0;
+  pauseProgress();
 }
 
 function startNowTicker() {
-  stopNowTicker();
-  nowTimer = window.setInterval(() => {
-    nowMs.value = Date.now();
-  }, 1000);
+  resumeNowTicker();
 }
 
-function schedulePolling(runImmediateRefresh: boolean) {
-  stopPollingTimers();
-  if (!jobs.pollingEnabled) return;
-
-  const interval = jobs.pollingIntervalMs;
-
-  const startNextCycle = () => {
-    nextRefreshAt = performance.now() + interval;
-    startProgressLoop();
-    pollTimer = window.setTimeout(async () => {
-      await refreshAll();
-      startNextCycle();
-    }, interval);
-  };
-
-  if (runImmediateRefresh) {
-    void refreshAll().finally(startNextCycle);
-  } else {
-    startNextCycle();
-  }
+function stopNowTicker() {
+  pauseNowTicker();
 }
 
 async function refreshNow() {
-  stopPollingTimers();
+  stopPollTimeout();
+  nextRefreshAt.value = null;
   await refreshAll();
   if (jobs.pollingEnabled) {
     schedulePolling(false);

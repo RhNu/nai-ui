@@ -5,6 +5,11 @@ import { useMetaStore } from "@/stores/meta";
 import type { CharacterPrompt, PromptPreset } from "@/api/types";
 import PromptFields from "../form/PromptFields.vue";
 import CharacterCollapse from "../form/CharacterCollapse.vue";
+import {
+  POSITION_OPTIONS,
+  centerToPosition,
+  positionToCenter,
+} from "@/composables/useCharacterPosition";
 
 const metaStore = useMetaStore();
 
@@ -248,68 +253,9 @@ void refreshNames().then(() => loadSelected(true));
 
     <CharacterCollapse
       :form="(form as any)"
-      :position-options="[
-        'A1',
-        'A2',
-        'A3',
-        'A4',
-        'A5',
-        'B1',
-        'B2',
-        'B3',
-        'B4',
-        'B5',
-        'C1',
-        'C2',
-        'C3',
-        'C4',
-        'C5',
-        'D1',
-        'D2',
-        'D3',
-        'D4',
-        'D5',
-        'E1',
-        'E2',
-        'E3',
-        'E4',
-        'E5',
-      ]"
-      :center-to-position="(c) => {
-        const offset = 0.1;
-        const grid = [0, 1, 2, 3, 4].map((i) => Math.round((i * 0.2 + offset) * 10) / 10);
-        const nearestIndex = (v: number) => {
-          let bestIdx = 0;
-          let bestDist = Number.POSITIVE_INFINITY;
-          for (let i = 0; i < grid.length; i++) {
-            const d = Math.abs(grid[i] - v);
-            if (d < bestDist) {
-              bestDist = d;
-              bestIdx = i;
-            }
-          }
-          return bestIdx;
-        };
-        const li = nearestIndex(c.x);
-        const ni = nearestIndex(c.y);
-        return `${String.fromCharCode(65 + li)}${String(ni + 1)}`;
-      }"
-      :position-to-center="
-        (p) => {
-          const offset = 0.1;
-          const letter = p[0] ?? 'C';
-          const number = p[1] ?? '3';
-          const li = Math.min(
-            4,
-            Math.max(0, letter.toUpperCase().charCodeAt(0) - 65)
-          );
-          const ni = Math.min(4, Math.max(0, parseInt(number, 10) - 1));
-          return {
-            x: Math.round((li * 0.2 + offset) * 10) / 10,
-            y: Math.round((ni * 0.2 + offset) * 10) / 10,
-          };
-        }
-      "
+      :position-options="POSITION_OPTIONS"
+      :center-to-position="centerToPosition"
+      :position-to-center="positionToCenter"
     />
   </div>
 </template>
