@@ -15,7 +15,8 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/api/anlas", get(anlas))
 }
 
-async fn health() -> ApiResult<serde_json::Value> {
+async fn health(State(state): State<Arc<AppState>>) -> ApiResult<serde_json::Value> {
+    state.db.health_check().map_err(ApiError::internal)?;
     Ok(Json(json!({ "ok": true })))
 }
 

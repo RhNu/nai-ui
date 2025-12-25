@@ -1,9 +1,7 @@
-use std::path::PathBuf;
-
 use anyhow::Context;
 use nai_core::dto::Center;
 
-use crate::simple_json_store::NameJsonStore;
+use crate::{db::Database, simple_json_store::NameJsonStore};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CharacterSlotPreset {
@@ -18,9 +16,9 @@ pub struct CharacterPresetStore {
 }
 
 impl CharacterPresetStore {
-    pub fn new(db_path: PathBuf) -> anyhow::Result<Self> {
+    pub fn new(db: Database) -> anyhow::Result<Self> {
         Ok(Self {
-            inner: NameJsonStore::new(db_path, "character_presets")?,
+            inner: NameJsonStore::new(db, "character_presets")?,
         })
     }
 

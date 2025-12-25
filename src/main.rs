@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use axum::Router;
 use nai_api::{
-    AppState, CharacterPresetStore, LastGenerationStore, PresetStore, PromptPresetStore,
+    AppState, CharacterPresetStore, Database, LastGenerationStore, PresetStore, PromptPresetStore,
+    PromptSnippetStore,
 };
 use nai_core::{config::AppConfig, job::JobStore, outputs::OutputStore};
 use nai_nai::NaiClient;
@@ -25,11 +26,12 @@ async fn main() -> anyhow::Result<()> {
     let nai_cli = NaiClient::new(config.token.clone(), config.proxy.clone())?;
     let outputs = OutputStore::new(&config)?;
 
-    let last_generation_db = config.output_dir.join("nai-ui.sqlite");
-    let last_generation = LastGenerationStore::new(last_generation_db)?;
+    let db = Database::sqlite(config.output_dir.join("nai-ui.sqlite"))?;
+    db.health_check()?;
 
-    let presets_db = config.output_dir.join("nai-ui.sqlite");
-    let presets = PresetStore::new(presets_db)?;
+    let last_generation = LastGenerationStore::new(db.clone())?;
+
+    let presets = PresetStore::new(db.clone())?;
     presets
         .ensure_defaults(&[
             "nai-diffusion-4-5-full",
@@ -41,12 +43,12 @@ async fn main() -> anyhow::Result<()> {
         ])
         .await?;
 
-    let prompt_presets_db = config.output_dir.join("nai-ui.sqlite");
-    let prompt_presets = PromptPresetStore::new(prompt_presets_db)?;
+    let prompt_presets = PromptPresetStore::new(db.clone())?;
     prompt_presets.ensure_default().await?;
 
-    let character_presets_db = config.output_dir.join("nai-ui.sqlite");
-    let character_presets = CharacterPresetStore::new(character_presets_db)?;
+    let character_presets = CharacterPresetStore::new(db.clone())?;
+
+    let prompt_snippets = PromptSnippetStore::new(db.clone())?;
 
     let jobs = JobStore::new();
     let job_sem = Arc::new(Semaphore::new(1));
@@ -62,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
 
     let state = Arc::new(AppState {
         config,
+        db,
         nai: nai_cli,
         outputs,
         jobs,
@@ -70,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
         presets,
         prompt_presets,
         character_presets,
+        prompt_snippets,
     });
 
     let app: Router;

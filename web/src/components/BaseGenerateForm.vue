@@ -359,18 +359,26 @@ function removeReference(idx: number) {
   <form class="grid gap-3" @submit.prevent="onSubmit">
     <ModelSamplerRow :form="form" />
 
-    <PromptPresetApplyRow
-      :form="form"
-      :inflate-character-slots="inflateCharacterSlots"
-    />
+    <div class="grid gap-3 lg:grid-cols-3">
+      <PromptPresetApplyRow
+        :form="form"
+        :inflate-character-slots="inflateCharacterSlots"
+      />
+
+      <GeneratePresetApplyRow
+        :model="form.model"
+        :on-apply-preset-to-form="applyPresetToForm"
+        :on-apply-defaults-for-model="applyPresetForModel"
+      />
+
+      <CharacterPresetApplyRow
+        v-if="!isV3Model"
+        :form="form"
+        :slots="CHARACTER_SLOTS"
+      />
+    </div>
 
     <PromptFields :form="form" />
-
-    <GeneratePresetApplyRow
-      :model="form.model"
-      :on-apply-preset-to-form="applyPresetToForm"
-      :on-apply-defaults-for-model="applyPresetForModel"
-    />
 
     <CoreParamsGrid
       :form="form"
@@ -380,12 +388,6 @@ function removeReference(idx: number) {
     />
     <SamplingParamsGrid :form="form" />
     <TogglesRow :form="form" :is-v3-model="isV3Model" />
-
-    <CharacterPresetApplyRow
-      v-if="!isV3Model"
-      :form="form"
-      :slots="CHARACTER_SLOTS"
-    />
 
     <CharacterCollapse
       v-if="!isV3Model"

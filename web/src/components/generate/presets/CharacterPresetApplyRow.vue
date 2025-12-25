@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { endpoints } from "@/api/endpoints";
+import { computed, onMounted, ref } from "vue";
+import { usePresetStore } from "@/stores/presets";
 import type { BaseGenerateRequest, CharacterPrompt } from "@/api/types";
 
 const props = defineProps<{
@@ -8,19 +8,19 @@ const props = defineProps<{
   slots?: number;
 }>();
 
+const presetStore = usePresetStore();
 const slots = Math.max(1, Math.floor(props.slots ?? 6));
 
 const slot = ref(1);
 const selected = ref<string>("");
-const names = ref<string[]>([]);
 const busy = ref(false);
 
+const names = computed(() => presetStore.characterNames);
+
 async function refreshNames() {
-  try {
-    const r = await endpoints.characterPresetsList();
-    names.value = (r.names ?? []).slice();
-  } catch {
-    names.value = [];
+  const list = await presetStore.refreshCharacterNames();
+  if (!list.includes(selected.value)) {
+    selected.value = list[0] ?? "";
   }
 }
 
@@ -34,8 +34,8 @@ async function applyToSlot() {
 
   busy.value = true;
   try {
-    const r = await endpoints.characterPresetGet(name);
-    if (!r.preset) return;
+    const preset = await presetStore.fetchCharacterPreset(name);
+    if (!preset) return;
 
     const idx = currentSlotIndex();
     const slotObj = (props.form.character_prompts?.[idx] ??
@@ -43,9 +43,9 @@ async function applyToSlot() {
     if (!slotObj) return;
 
     slotObj.enabled = true;
-    slotObj.prompt = r.preset.prompt;
-    slotObj.uc = r.preset.uc;
-    slotObj.center = r.preset.center;
+    slotObj.prompt = preset.prompt;
+    slotObj.uc = preset.uc;
+    slotObj.center = preset.center;
   } catch (error) {
     console.warn("Failed to apply character preset", error);
   } finally {
@@ -53,7 +53,7 @@ async function applyToSlot() {
   }
 }
 
-onMounted(refreshNames);
+onMounted(() => void refreshNames());
 </script>
 
 <template>

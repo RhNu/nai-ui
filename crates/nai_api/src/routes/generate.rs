@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{Json, Router, extract::State, routing::post};
 use tracing::{info, warn};
 
 use nai_core::dto::{
@@ -9,6 +9,49 @@ use nai_core::dto::{
 use nai_core::services;
 
 use super::{ApiError, ApiResult, AppState};
+
+async fn apply_snippets_to_base(
+    state: &AppState,
+    base: &mut BaseGenerateRequest,
+) -> Result<(), ApiError> {
+    let mut warnings = Vec::new();
+
+    let expanded = crate::expand_prompts_pair(
+        &state.config,
+        &state.prompt_snippets,
+        &base.positive,
+        &base.negative,
+    )
+    .await
+    .map_err(ApiError::bad_request)?;
+    warnings.extend(expanded.warnings.iter().cloned());
+    base.positive = expanded.positive;
+    base.negative = expanded.negative;
+
+    if let Some(chars) = base.character_prompts.as_mut() {
+        for cp in chars.iter_mut() {
+            if cp.prompt.trim().is_empty() && cp.uc.trim().is_empty() {
+                continue;
+            }
+            let expanded_char = crate::expand_prompts_pair(
+                &state.config,
+                &state.prompt_snippets,
+                &cp.prompt,
+                &cp.uc,
+            )
+            .await
+            .map_err(ApiError::bad_request)?;
+            warnings.extend(expanded_char.warnings.iter().cloned());
+            cp.prompt = expanded_char.positive;
+            cp.uc = expanded_char.negative;
+        }
+    }
+
+    for w in warnings {
+        warn!(warning = %w, "prompt snippet warning");
+    }
+    Ok(())
+}
 
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -22,6 +65,8 @@ async fn t2i(
     State(state): State<Arc<AppState>>,
     Json(req): Json<BaseGenerateRequest>,
 ) -> ApiResult<GenerateResponse> {
+    let mut req = req;
+    apply_snippets_to_base(&state, &mut req).await?;
     info!(
         model = %req.model,
         width = req.width,
@@ -45,6 +90,8 @@ async fn i2i(
     State(state): State<Arc<AppState>>,
     Json(req): Json<Img2ImgRequest>,
 ) -> ApiResult<GenerateResponse> {
+    let mut req = req;
+    apply_snippets_to_base(&state, &mut req.base).await?;
     info!(
         model = %req.base.model,
         width = req.base.width,
@@ -68,6 +115,8 @@ async fn inpaint(
     State(state): State<Arc<AppState>>,
     Json(req): Json<InpaintRequest>,
 ) -> ApiResult<GenerateResponse> {
+    let mut req = req;
+    apply_snippets_to_base(&state, &mut req.base).await?;
     info!(
         model = %req.base.model,
         width = req.base.width,
@@ -91,6 +140,8 @@ async fn character(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CharacterRequest>,
 ) -> ApiResult<GenerateResponse> {
+    let mut req = req;
+    apply_snippets_to_base(&state, &mut req.base).await?;
     info!(
         model = %req.base.model,
         width = req.base.width,

@@ -17,6 +17,14 @@ function isActive(path: string) {
       <RouterLink
         role="tab"
         class="tab rounded-full px-4 text-sm"
+        :class="{ 'tab-active shadow': isActive('/presets/snippet') }"
+        to="/presets/snippet"
+      >
+        片段库
+      </RouterLink>
+      <RouterLink
+        role="tab"
+        class="tab rounded-full px-4 text-sm"
         :class="{ 'tab-active shadow': isActive('/presets/generate') }"
         to="/presets/generate"
       >

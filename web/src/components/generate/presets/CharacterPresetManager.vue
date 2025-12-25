@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
 import { endpoints } from "@/api/endpoints";
+import { usePresetStore } from "@/stores/presets";
 import {
   POSITION_OPTIONS,
   centerToPosition,
@@ -8,9 +9,11 @@ import {
 } from "@/composables/useCharacterPosition";
 import type { CharacterSlotPreset } from "@/api/types";
 
+const presetStore = usePresetStore();
 const busy = ref(false);
-const presetNames = ref<string[]>([]);
 const selected = ref<string>("");
+
+const presetNames = computed(() => presetStore.characterNames);
 
 const working = reactive<CharacterSlotPreset>({
   prompt: "",
@@ -30,11 +33,9 @@ const position = computed({
 });
 
 async function refreshNames() {
-  try {
-    const r = await endpoints.characterPresetsList();
-    presetNames.value = (r.names ?? []).slice();
-  } catch {
-    presetNames.value = [];
+  const names = await presetStore.refreshCharacterNames();
+  if (!names.includes(selected.value)) {
+    selected.value = names[0] ?? "";
   }
 }
 
@@ -43,11 +44,11 @@ async function loadSelected() {
   if (!name) return;
   busy.value = true;
   try {
-    const r = await endpoints.characterPresetGet(name);
-    if (!r.preset) return;
-    working.prompt = r.preset.prompt;
-    working.uc = r.preset.uc;
-    working.center = r.preset.center;
+    const preset = await presetStore.fetchCharacterPreset(name);
+    if (!preset) return;
+    working.prompt = preset.prompt;
+    working.uc = preset.uc;
+    working.center = preset.center;
   } finally {
     busy.value = false;
   }
@@ -59,6 +60,7 @@ async function save() {
   busy.value = true;
   try {
     await endpoints.characterPresetPut({ name, preset: { ...working } });
+    presetStore.rememberCharacterPreset(name, { ...working });
     selected.value = name;
     saveAsName.value = "";
     await refreshNames();
@@ -75,6 +77,8 @@ async function rename() {
   busy.value = true;
   try {
     await endpoints.characterPresetRename({ from, to });
+    presetStore.evictCharacterPreset(from);
+    presetStore.rememberCharacterPreset(to, { ...working });
     selected.value = to;
     await refreshNames();
   } finally {
@@ -89,6 +93,7 @@ async function remove() {
   busy.value = true;
   try {
     await endpoints.characterPresetDelete(name);
+    presetStore.evictCharacterPreset(name);
     selected.value = "";
     await refreshNames();
   } finally {

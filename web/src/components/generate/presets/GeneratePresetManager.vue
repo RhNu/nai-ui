@@ -2,14 +2,19 @@
 import { computed, reactive, ref, watch } from "vue";
 import { endpoints } from "@/api/endpoints";
 import { useMetaStore } from "@/stores/meta";
+import { usePresetStore } from "@/stores/presets";
 import type { GeneratePreset } from "@/api/types";
 
 const metaStore = useMetaStore();
+const presetStore = usePresetStore();
 
 const model = ref<string>("nai-diffusion-4-5-full");
 const presetName = ref<string>("");
-const presetNames = ref<string[]>([]);
 const busy = ref(false);
+
+const presetNames = computed(
+  () => presetStore.generateNames[model.value] ?? []
+);
 
 const isV3Model = computed(
   () =>
@@ -59,17 +64,9 @@ function applyDefaultsForModel(m: string) {
 }
 
 async function refreshNames() {
-  try {
-    const r = await endpoints.presetsList(model.value);
-    const names = (r.names ?? []).slice();
-    presetNames.value = names;
-
-    if (!names.includes(presetName.value)) {
-      presetName.value = names[0] ?? "";
-    }
-  } catch {
-    presetNames.value = [];
-    presetName.value = "";
+  const names = await presetStore.refreshGenerateNames(model.value);
+  if (!names.includes(presetName.value)) {
+    presetName.value = names[0] ?? "";
   }
 }
 
@@ -81,14 +78,14 @@ async function loadSelected() {
   }
   busy.value = true;
   try {
-    const r = await endpoints.presetGet(model.value, name);
-    if (!r.preset) {
+    const p = await presetStore.fetchGeneratePreset(model.value, name);
+    if (!p) {
       applyDefaultsForModel(model.value);
       return;
     }
 
     // copy fields
-    Object.assign(preset, r.preset);
+    Object.assign(preset, p);
   } catch {
     applyDefaultsForModel(model.value);
   } finally {
@@ -109,6 +106,7 @@ async function save() {
       name,
       preset: { ...preset },
     });
+    presetStore.rememberGeneratePreset(model.value, name, { ...preset });
     presetName.value = name;
     await refreshNames();
   } finally {
@@ -124,6 +122,8 @@ async function rename() {
   busy.value = true;
   try {
     await endpoints.presetRename({ model: model.value, from, to });
+    presetStore.evictGeneratePreset(model.value, from);
+    presetStore.rememberGeneratePreset(model.value, to, { ...preset });
     presetName.value = to;
     await refreshNames();
   } finally {
@@ -138,6 +138,7 @@ async function remove() {
   busy.value = true;
   try {
     await endpoints.presetDelete(model.value, name);
+    presetStore.evictGeneratePreset(model.value, name);
     await refreshNames();
     presetName.value = presetNames.value[0] ?? "";
     await loadSelected();

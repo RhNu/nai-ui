@@ -9,6 +9,7 @@ import GeneratePresetsView from "@/views/generate/GeneratePresetsView.vue";
 import PresetsGenerateView from "@/views/presets/PresetsGenerateView.vue";
 import PresetsPromptView from "@/views/presets/PresetsPromptView.vue";
 import PresetsCharacterView from "@/views/presets/PresetsCharacterView.vue";
+import PresetsSnippetView from "@/views/presets/PresetsSnippetView.vue";
 import DirectorView from "@/views/DirectorView.vue";
 import JobsView from "@/views/JobsView.vue";
 import OutputsView from "@/views/OutputsView.vue";
@@ -51,6 +52,11 @@ export const router = createRouter({
       path: "/presets/prompt",
       name: "presets-prompt",
       component: PresetsPromptView,
+    },
+    {
+      path: "/presets/snippet",
+      name: "presets-snippet",
+      component: PresetsSnippetView,
     },
     {
       path: "/presets/character",

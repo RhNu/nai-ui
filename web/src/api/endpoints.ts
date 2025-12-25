@@ -27,6 +27,12 @@ import type {
   PresetPutRequest,
   PresetRenameRequest,
   PresetsListResponse,
+  PromptSnippetGetResponse,
+  PromptSnippetPreviewRequest,
+  PromptSnippetPreviewResponse,
+  PromptSnippetPutRequest,
+  PromptSnippetRenameRequest,
+  PromptSnippetsListResponse,
   PromptPresetGetResponse,
   PromptPresetPutRequest,
   PromptPresetRenameRequest,
@@ -95,6 +101,37 @@ export const endpoints = {
   promptPresetRename: (req: PromptPresetRenameRequest) =>
     apiPost<PromptPresetRenameRequest, { ok: boolean }>(
       "/api/prompt_preset/rename",
+      req
+    ),
+
+  promptSnippetsList: (params?: { q?: string; tags?: string[] }) => {
+    const search = new URLSearchParams();
+    if (params?.q) search.set("q", params.q);
+    if (params?.tags?.length) search.set("tags", params.tags.join(","));
+    const suffix = search.toString() ? `?${search.toString()}` : "";
+    return apiGet<PromptSnippetsListResponse>(`/api/prompt_snippets${suffix}`);
+  },
+  promptSnippetGet: (name: string) =>
+    apiGet<PromptSnippetGetResponse>(
+      `/api/prompt_snippet?name=${encodeURIComponent(name)}`
+    ),
+  promptSnippetPut: (req: PromptSnippetPutRequest) =>
+    apiPut<PromptSnippetPutRequest, { ok: boolean }>(
+      "/api/prompt_snippet",
+      req
+    ),
+  promptSnippetDelete: (name: string) =>
+    apiDelete<{ ok: boolean }>(
+      `/api/prompt_snippet?name=${encodeURIComponent(name)}`
+    ),
+  promptSnippetRename: (req: PromptSnippetRenameRequest) =>
+    apiPost<PromptSnippetRenameRequest, { ok: boolean }>(
+      "/api/prompt_snippet/rename",
+      req
+    ),
+  promptSnippetPreview: (req: PromptSnippetPreviewRequest) =>
+    apiPost<PromptSnippetPreviewRequest, PromptSnippetPreviewResponse>(
+      "/api/prompt_snippet/preview",
       req
     ),
 

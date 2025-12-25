@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { endpoints } from "@/api/endpoints";
+import { computed, ref } from "vue";
+import { usePresetStore } from "@/stores/presets";
 import type {
   BaseGenerateRequest,
   CharacterPrompt,
@@ -14,22 +14,16 @@ const props = defineProps<{
   ) => CharacterPrompt[];
 }>();
 
+const presetStore = usePresetStore();
 const presetName = ref<string>("");
-const presetNames = ref<string[]>([]);
 const busy = ref(false);
 
-async function refreshNames() {
-  try {
-    const r = await endpoints.promptPresetsList();
-    const names = (r.names ?? []).slice();
-    presetNames.value = names;
+const presetNames = computed(() => presetStore.promptNames);
 
-    if (!names.includes(presetName.value)) {
-      presetName.value = names[0] ?? "";
-    }
-  } catch {
-    presetNames.value = [];
-    presetName.value = "";
+async function refreshNames() {
+  const names = await presetStore.refreshPromptNames();
+  if (!names.includes(presetName.value)) {
+    presetName.value = names[0] ?? "";
   }
 }
 
@@ -50,8 +44,8 @@ async function applyOnce() {
   if (!name) return;
   busy.value = true;
   try {
-    const r = await endpoints.promptPresetGet(name);
-    if (r.preset) applyToForm(r.preset);
+    const preset = await presetStore.fetchPromptPreset(name);
+    if (preset) applyToForm(preset);
   } catch {
     // ignore
   } finally {

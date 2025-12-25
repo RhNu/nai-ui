@@ -25,6 +25,49 @@ use nai_nai::NaiError;
 
 use super::{ApiError, ApiResult, AppState};
 
+async fn apply_snippets_to_base(
+    state: &AppState,
+    base: &mut BaseGenerateRequest,
+) -> Result<(), ApiError> {
+    let mut warnings = Vec::new();
+
+    let expanded = crate::expand_prompts_pair(
+        &state.config,
+        &state.prompt_snippets,
+        &base.positive,
+        &base.negative,
+    )
+    .await
+    .map_err(ApiError::bad_request)?;
+    warnings.extend(expanded.warnings.iter().cloned());
+    base.positive = expanded.positive;
+    base.negative = expanded.negative;
+
+    if let Some(chars) = base.character_prompts.as_mut() {
+        for cp in chars.iter_mut() {
+            if cp.prompt.trim().is_empty() && cp.uc.trim().is_empty() {
+                continue;
+            }
+            let expanded_char = crate::expand_prompts_pair(
+                &state.config,
+                &state.prompt_snippets,
+                &cp.prompt,
+                &cp.uc,
+            )
+            .await
+            .map_err(ApiError::bad_request)?;
+            warnings.extend(expanded_char.warnings.iter().cloned());
+            cp.prompt = expanded_char.positive;
+            cp.uc = expanded_char.negative;
+        }
+    }
+
+    for w in warnings {
+        warn!(warning = %w, "prompt snippet warning");
+    }
+    Ok(())
+}
+
 #[derive(Serialize)]
 struct JobsListResponse {
     items: Vec<JobSummary>,
@@ -93,6 +136,8 @@ async fn job_t2i(
     State(state): State<Arc<AppState>>,
     Json(req): Json<BaseGenerateRequest>,
 ) -> ApiResult<JobSubmitResponse> {
+    let mut req = req;
+    apply_snippets_to_base(&state, &mut req).await?;
     if let Err(e) = state.last_generation.set_from_base(&req).await {
         warn!(error = %e, "failed to cache last_generation");
     }
@@ -108,6 +153,8 @@ async fn job_i2i(
     State(state): State<Arc<AppState>>,
     Json(req): Json<Img2ImgRequest>,
 ) -> ApiResult<JobSubmitResponse> {
+    let mut req = req;
+    apply_snippets_to_base(&state, &mut req.base).await?;
     if let Err(e) = state.last_generation.set_from_base(&req.base).await {
         warn!(error = %e, "failed to cache last_generation");
     }
@@ -123,6 +170,8 @@ async fn job_inpaint(
     State(state): State<Arc<AppState>>,
     Json(req): Json<InpaintRequest>,
 ) -> ApiResult<JobSubmitResponse> {
+    let mut req = req;
+    apply_snippets_to_base(&state, &mut req.base).await?;
     if let Err(e) = state.last_generation.set_from_base(&req.base).await {
         warn!(error = %e, "failed to cache last_generation");
     }
@@ -138,6 +187,8 @@ async fn job_character(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CharacterRequest>,
 ) -> ApiResult<JobSubmitResponse> {
+    let mut req = req;
+    apply_snippets_to_base(&state, &mut req.base).await?;
     if let Err(e) = state.last_generation.set_from_base(&req.base).await {
         warn!(error = %e, "failed to cache last_generation");
     }

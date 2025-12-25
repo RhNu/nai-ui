@@ -1,12 +1,10 @@
-use std::{
-    path::PathBuf,
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
 use nai_core::dto::{BaseGenerateRequest, CharacterPrompt};
 use rusqlite::{Connection, OptionalExtension, params};
+
+use crate::db::Database;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LastGenerationRecord {
@@ -16,49 +14,43 @@ pub struct LastGenerationRecord {
 
 #[derive(Debug, Clone)]
 pub struct LastGenerationStore {
-    db_path: Arc<PathBuf>,
+    db: Database,
 }
 
 impl LastGenerationStore {
-    pub fn new(db_path: PathBuf) -> anyhow::Result<Self> {
-        let conn = Self::open(&db_path)?;
-        Self::init_schema(&conn)?;
-        Ok(Self {
-            db_path: Arc::new(db_path),
-        })
+    pub fn new(db: Database) -> anyhow::Result<Self> {
+        db.with_conn(Self::init_schema)?;
+        Ok(Self { db })
     }
 
     pub async fn get(&self) -> anyhow::Result<Option<LastGenerationRecord>> {
-        let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || {
-            let conn = Self::open(&db_path)?;
-            let row: Option<(i64, String, String, String, String, String)> = conn
-                .query_row(
-                    "SELECT updated_at_ms, base_json, model, positive, negative, character_prompts_json FROM last_generation WHERE id = 1",
-                    [],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
-                )
-                .optional()?;
+        self.db
+            .with_conn_blocking("last_generation get", move |conn| {
+                let row: Option<(i64, String, String, String, String, String)> = conn
+                    .query_row(
+                        "SELECT updated_at_ms, base_json, model, positive, negative, character_prompts_json FROM last_generation WHERE id = 1",
+                        [],
+                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+                    )
+                    .optional()?;
 
-            let Some((updated_at_ms, base_json, model, positive, negative, character_prompts_json)) = row else {
-                return Ok(None);
-            };
+                let Some((updated_at_ms, base_json, model, positive, negative, character_prompts_json)) = row else {
+                    return Ok(None);
+                };
 
-            // Prefer full base_json; fall back to legacy prompt-only columns.
-            let base: Option<BaseGenerateRequest> = serde_json::from_str(&base_json).ok();
-            let base = match base {
-                Some(b) => b,
-                None => {
-                    let character_prompts: Vec<CharacterPrompt> =
-                        serde_json::from_str(&character_prompts_json).unwrap_or_default();
-                    default_base_for_model(&model, &positive, &negative, character_prompts)
-                }
-            };
+                let base: Option<BaseGenerateRequest> = serde_json::from_str(&base_json).ok();
+                let base = match base {
+                    Some(b) => b,
+                    None => {
+                        let character_prompts: Vec<CharacterPrompt> =
+                            serde_json::from_str(&character_prompts_json).unwrap_or_default();
+                        default_base_for_model(&model, &positive, &negative, character_prompts)
+                    }
+                };
 
-            Ok(Some(LastGenerationRecord { updated_at_ms, base }))
-        })
-        .await
-        .context("join last_generation get")?
+                Ok(Some(LastGenerationRecord { updated_at_ms, base }))
+            })
+            .await
     }
 
     pub async fn set_from_base(&self, base: &BaseGenerateRequest) -> anyhow::Result<()> {
@@ -70,58 +62,41 @@ impl LastGenerationStore {
     }
 
     pub async fn set(&self, record: LastGenerationRecord) -> anyhow::Result<()> {
-        let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || {
-            let conn = Self::open(&db_path)?;
-            let base_json = serde_json::to_string(&record.base).context("serialize base")?;
-            let character_prompts_json = serde_json::to_string(
-                &record.base.character_prompts.clone().unwrap_or_default(),
-            )
+        self.db
+            .with_conn_blocking("last_generation set", move |conn| {
+                let base_json = serde_json::to_string(&record.base).context("serialize base")?;
+                let character_prompts_json = serde_json::to_string(
+                    &record.base.character_prompts.clone().unwrap_or_default(),
+                )
                 .context("serialize character_prompts")?;
 
-            conn.execute(
-                "INSERT OR REPLACE INTO last_generation (id, updated_at_ms, base_json, model, positive, negative, character_prompts_json) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    record.updated_at_ms,
-                    base_json,
-                    record.base.model,
-                    record.base.positive,
-                    record.base.negative,
-                    character_prompts_json,
-                ],
-            )?;
+                conn.execute(
+                    "INSERT OR REPLACE INTO last_generation (id, updated_at_ms, base_json, model, positive, negative, character_prompts_json) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        record.updated_at_ms,
+                        base_json,
+                        record.base.model,
+                        record.base.positive,
+                        record.base.negative,
+                        character_prompts_json,
+                    ],
+                )?;
 
-            Ok(())
-        })
-        .await
-        .context("join last_generation set")?
+                Ok(())
+            })
+            .await
     }
 
     pub async fn clear(&self) -> anyhow::Result<()> {
-        let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || {
-            let conn = Self::open(&db_path)?;
-            conn.execute("DELETE FROM last_generation WHERE id = 1", [])?;
-            Ok(())
-        })
-        .await
-        .context("join last_generation clear")?
+        self.db
+            .with_conn_blocking("last_generation clear", move |conn| {
+                conn.execute("DELETE FROM last_generation WHERE id = 1", [])?;
+                Ok(())
+            })
+            .await
     }
 
-    fn open(db_path: &PathBuf) -> anyhow::Result<Connection> {
-        if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("create sqlite parent dir: {}", parent.display()))?;
-        }
-
-        let conn = Connection::open(db_path)
-            .with_context(|| format!("open sqlite db: {}", db_path.display()))?;
-        conn.busy_timeout(std::time::Duration::from_secs(3))?;
-        conn.pragma_update(None, "journal_mode", "WAL")?;
-        Ok(conn)
-    }
-
-    fn init_schema(conn: &Connection) -> anyhow::Result<()> {
+    fn init_schema(conn: &mut Connection) -> anyhow::Result<()> {
         conn.execute_batch(
             "\
             CREATE TABLE IF NOT EXISTS last_generation (

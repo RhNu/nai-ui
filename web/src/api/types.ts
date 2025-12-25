@@ -208,6 +208,47 @@ export type PromptPresetRenameRequest = {
   to: string;
 };
 
+export type PromptSnippet = {
+  body: string;
+  tags: string[];
+  description?: string | null;
+};
+
+export type PromptSnippetSummary = {
+  name: string;
+  tags: string[];
+  description?: string | null;
+};
+
+export type PromptSnippetsListResponse = {
+  items: PromptSnippetSummary[];
+};
+
+export type PromptSnippetGetResponse = {
+  snippet: PromptSnippet | null;
+};
+
+export type PromptSnippetPutRequest = {
+  name: string;
+  snippet: PromptSnippet;
+};
+
+export type PromptSnippetRenameRequest = {
+  from: string;
+  to: string;
+};
+
+export type PromptSnippetPreviewRequest = {
+  positive: string;
+  negative: string;
+};
+
+export type PromptSnippetPreviewResponse = {
+  positive: string;
+  negative: string;
+  warnings: string[];
+};
+
 export type CharacterSlotPreset = {
   prompt: string;
   uc: string;

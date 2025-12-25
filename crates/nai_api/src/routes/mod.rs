@@ -7,7 +7,10 @@ use tower_http::services::{ServeDir, ServeFile};
 use nai_core::{config::AppConfig, job::JobStore, outputs::OutputStore};
 use nai_nai::NaiClient;
 
-use crate::{CharacterPresetStore, LastGenerationStore, PresetStore, PromptPresetStore};
+use crate::{
+    CharacterPresetStore, Database, LastGenerationStore, PresetStore, PromptPresetStore,
+    PromptSnippetStore,
+};
 
 mod character_presets;
 mod director;
@@ -19,12 +22,14 @@ mod meta;
 mod outputs;
 mod presets;
 mod prompt_presets;
+mod prompt_snippets;
 
 pub use error::{ApiError, ApiResult};
 
 #[derive(Clone)]
 pub struct AppState {
     pub config: AppConfig,
+    pub db: Database,
     pub nai: NaiClient,
     pub outputs: OutputStore,
     pub jobs: JobStore,
@@ -33,6 +38,7 @@ pub struct AppState {
     pub presets: PresetStore,
     pub prompt_presets: PromptPresetStore,
     pub character_presets: CharacterPresetStore,
+    pub prompt_snippets: PromptSnippetStore,
 }
 
 pub fn router(state: Arc<AppState>) -> Router {
@@ -45,6 +51,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .merge(last_generation::routes())
         .merge(presets::routes())
         .merge(prompt_presets::routes())
+        .merge(prompt_snippets::routes())
         .merge(character_presets::routes())
         .merge(generate::routes())
         .merge(jobs::routes())

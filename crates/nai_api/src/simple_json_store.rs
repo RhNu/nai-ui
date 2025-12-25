@@ -1,147 +1,123 @@
-use std::{path::PathBuf, sync::Arc};
+use std::marker::PhantomData;
 
 use anyhow::Context;
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::last_generation::now_ms;
-
-pub(crate) fn open_sqlite(db_path: &PathBuf) -> anyhow::Result<Connection> {
-    if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create sqlite parent dir: {}", parent.display()))?;
-    }
-
-    let conn = Connection::open(db_path)
-        .with_context(|| format!("open sqlite db: {}", db_path.display()))?;
-    conn.busy_timeout(std::time::Duration::from_secs(3))?;
-    conn.pragma_update(None, "journal_mode", "WAL")?;
-    Ok(conn)
-}
+use crate::{db::Database, last_generation::now_ms};
 
 #[derive(Debug, Clone)]
 pub(crate) struct NameJsonStore<T> {
-    db_path: Arc<PathBuf>,
+    db: Database,
     table: &'static str,
-    _phantom: std::marker::PhantomData<T>,
+    _phantom: PhantomData<T>,
 }
 
 impl<T> NameJsonStore<T>
 where
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + 'static,
 {
-    pub fn new(db_path: PathBuf, table: &'static str) -> anyhow::Result<Self> {
-        let conn = open_sqlite(&db_path)?;
-        init_name_table(&conn, table)?;
+    pub fn new(db: Database, table: &'static str) -> anyhow::Result<Self> {
+        db.with_conn(|conn| init_name_table(conn, table))?;
         Ok(Self {
-            db_path: Arc::new(db_path),
+            db,
             table,
-            _phantom: std::marker::PhantomData,
+            _phantom: PhantomData,
         })
     }
 
     pub async fn list_names(&self) -> anyhow::Result<Vec<String>> {
-        let db_path = self.db_path.clone();
         let table = self.table;
-        tokio::task::spawn_blocking(move || {
-            let conn = open_sqlite(&db_path)?;
-            let sql = format!("SELECT name FROM {table} ORDER BY updated_at_ms DESC");
-            let mut stmt = conn.prepare(&sql)?;
-            let mut rows = stmt.query([])?;
-            let mut out = vec![];
-            while let Some(r) = rows.next()? {
-                out.push(r.get::<_, String>(0)?);
-            }
-            Ok(out)
-        })
-        .await
-        .context("join list_names name-json")?
+        self.db
+            .with_conn_blocking("list_names name-json", move |conn| {
+                let sql = format!("SELECT name FROM {table} ORDER BY updated_at_ms DESC");
+                let mut stmt = conn.prepare(&sql)?;
+                let mut rows = stmt.query([])?;
+                let mut out = vec![];
+                while let Some(r) = rows.next()? {
+                    out.push(r.get::<_, String>(0)?);
+                }
+                Ok(out)
+            })
+            .await
     }
 
     pub async fn get(&self, name: &str) -> anyhow::Result<Option<T>> {
-        let db_path = self.db_path.clone();
         let table = self.table;
         let name = name.to_string();
-        tokio::task::spawn_blocking(move || {
-            let conn = open_sqlite(&db_path)?;
-            let sql = format!("SELECT preset_json FROM {table} WHERE name = ?1");
-            let row: Option<String> = conn
-                .query_row(&sql, params![name], |r| r.get(0))
-                .optional()?;
-            let Some(preset_json) = row else {
-                return Ok(None);
-            };
-            let preset = serde_json::from_str(&preset_json).context("parse preset json")?;
-            Ok(Some(preset))
-        })
-        .await
-        .context("join get name-json")?
+        self.db
+            .with_conn_blocking("get name-json", move |conn| {
+                let sql = format!("SELECT preset_json FROM {table} WHERE name = ?1");
+                let row: Option<String> = conn
+                    .query_row(&sql, params![name], |r| r.get(0))
+                    .optional()?;
+                let Some(preset_json) = row else {
+                    return Ok(None);
+                };
+                let preset = serde_json::from_str(&preset_json).context("parse preset json")?;
+                Ok(Some(preset))
+            })
+            .await
     }
 
     pub async fn upsert(&self, name: &str, preset: &T) -> anyhow::Result<()> {
-        let db_path = self.db_path.clone();
         let table = self.table;
         let name = name.to_string();
         let preset_json = serde_json::to_string(preset).context("serialize preset")?;
-        tokio::task::spawn_blocking(move || {
-            let conn = open_sqlite(&db_path)?;
-            let sql = format!(
-                "INSERT INTO {table} (name, updated_at_ms, preset_json) VALUES (?1, ?2, ?3)\
-                 ON CONFLICT(name) DO UPDATE SET updated_at_ms=excluded.updated_at_ms, preset_json=excluded.preset_json"
-            );
-            conn.execute(&sql, params![name, now_ms(), preset_json])?;
-            Ok(())
-        })
-        .await
-        .context("join upsert name-json")?
+        self.db
+            .with_conn_blocking("upsert name-json", move |conn| {
+                let sql = format!(
+                    "INSERT INTO {table} (name, updated_at_ms, preset_json) VALUES (?1, ?2, ?3)\
+                     ON CONFLICT(name) DO UPDATE SET updated_at_ms=excluded.updated_at_ms, preset_json=excluded.preset_json"
+                );
+                conn.execute(&sql, params![name, now_ms(), preset_json])?;
+                Ok(())
+            })
+            .await
     }
 
     pub async fn delete(&self, name: &str) -> anyhow::Result<bool> {
-        let db_path = self.db_path.clone();
         let table = self.table;
         let name = name.to_string();
-        tokio::task::spawn_blocking(move || {
-            let conn = open_sqlite(&db_path)?;
-            let sql = format!("DELETE FROM {table} WHERE name = ?1");
-            let rows = conn.execute(&sql, params![name])?;
-            Ok(rows > 0)
-        })
-        .await
-        .context("join delete name-json")?
+        self.db
+            .with_conn_blocking("delete name-json", move |conn| {
+                let sql = format!("DELETE FROM {table} WHERE name = ?1");
+                let rows = conn.execute(&sql, params![name])?;
+                Ok(rows > 0)
+            })
+            .await
     }
 
     pub async fn rename(&self, from: &str, to: &str) -> anyhow::Result<()> {
-        let db_path = self.db_path.clone();
         let table = self.table;
         let from = from.to_string();
         let to = to.to_string();
-        tokio::task::spawn_blocking(move || {
-            let mut conn = open_sqlite(&db_path)?;
-            let tx = conn.transaction()?;
+        self.db
+            .with_conn_blocking("rename name-json", move |conn| {
+                let tx = conn.transaction()?;
 
-            let exists_sql = format!("SELECT 1 FROM {table} WHERE name = ?1");
-            let exists: Option<i64> = tx
-                .query_row(&exists_sql, params![from], |r| r.get(0))
-                .optional()?;
-            if exists.is_none() {
-                return Ok(());
-            }
+                let exists_sql = format!("SELECT 1 FROM {table} WHERE name = ?1");
+                let exists: Option<i64> = tx
+                    .query_row(&exists_sql, params![from], |r| r.get(0))
+                    .optional()?;
+                if exists.is_none() {
+                    return Ok(());
+                }
 
-            let conflict_sql = format!("SELECT 1 FROM {table} WHERE name = ?1");
-            let conflict: Option<i64> = tx
-                .query_row(&conflict_sql, params![to], |r| r.get(0))
-                .optional()?;
-            if conflict.is_some() {
-                anyhow::bail!("preset already exists: {to}");
-            }
+                let conflict_sql = format!("SELECT 1 FROM {table} WHERE name = ?1");
+                let conflict: Option<i64> = tx
+                    .query_row(&conflict_sql, params![to], |r| r.get(0))
+                    .optional()?;
+                if conflict.is_some() {
+                    anyhow::bail!("preset already exists: {to}");
+                }
 
-            let update_sql =
-                format!("UPDATE {table} SET name = ?2, updated_at_ms = ?3 WHERE name = ?1");
-            tx.execute(&update_sql, params![from, to, now_ms()])?;
-            tx.commit()?;
-            Ok(())
-        })
-        .await
-        .context("join rename name-json")?
+                let update_sql =
+                    format!("UPDATE {table} SET name = ?2, updated_at_ms = ?3 WHERE name = ?1");
+                tx.execute(&update_sql, params![from, to, now_ms()])?;
+                tx.commit()?;
+                Ok(())
+            })
+            .await
     }
 }
 

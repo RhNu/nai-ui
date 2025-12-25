@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import { endpoints } from "@/api/endpoints";
+import { computed, ref, watch } from "vue";
+import { usePresetStore } from "@/stores/presets";
 import type { GeneratePreset } from "@/api/types";
 
 const props = defineProps<{
@@ -9,22 +9,19 @@ const props = defineProps<{
   onApplyDefaultsForModel: (model: string) => void;
 }>();
 
+const presetStore = usePresetStore();
+
 const presetName = ref<string>("");
-const presetNames = ref<string[]>([]);
 const presetBusy = ref(false);
 
-async function refreshPresetNames() {
-  try {
-    const r = await endpoints.presetsList(props.model);
-    const names = (r.names ?? []).slice();
-    presetNames.value = names;
+const presetNames = computed(
+  () => presetStore.generateNames[props.model] ?? []
+);
 
-    if (!names.includes(presetName.value)) {
-      presetName.value = names[0] ?? "";
-    }
-  } catch {
-    presetNames.value = [];
-    presetName.value = "";
+async function refreshPresetNames() {
+  const names = await presetStore.refreshGenerateNames(props.model);
+  if (!names.includes(presetName.value)) {
+    presetName.value = names[0] ?? "";
   }
 }
 
@@ -33,9 +30,9 @@ async function applySelectedPreset() {
   if (!name) return;
   presetBusy.value = true;
   try {
-    const r = await endpoints.presetGet(props.model, name);
-    if (r.preset) {
-      props.onApplyPresetToForm(props.model, r.preset);
+    const preset = await presetStore.fetchGeneratePreset(props.model, name);
+    if (preset) {
+      props.onApplyPresetToForm(props.model, preset);
     } else {
       props.onApplyDefaultsForModel(props.model);
     }

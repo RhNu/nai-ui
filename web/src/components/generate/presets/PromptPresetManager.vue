@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from "vue";
 import { endpoints } from "@/api/endpoints";
 import { useMetaStore } from "@/stores/meta";
+import { usePresetStore } from "@/stores/presets";
 import type { CharacterPrompt, PromptPreset } from "@/api/types";
 import PromptFields from "../form/PromptFields.vue";
 import CharacterCollapse from "../form/CharacterCollapse.vue";
@@ -12,10 +13,12 @@ import {
 } from "@/composables/useCharacterPosition";
 
 const metaStore = useMetaStore();
+const presetStore = usePresetStore();
 
 const presetName = ref<string>("");
-const presetNames = ref<string[]>([]);
 const busy = ref(false);
+
+const presetNames = computed(() => presetStore.promptNames);
 
 const form = reactive({
   positive: "",
@@ -69,17 +72,11 @@ function fromPreset(p: PromptPreset) {
 }
 
 async function refreshNames() {
-  try {
-    const r = await endpoints.promptPresetsList();
-    const names = (r.names ?? []).slice();
-    presetNames.value = names;
+  const names = await presetStore.refreshPromptNames();
 
-    // If current选项无效，回退到第一个有效名称。
-    if (!names.includes(presetName.value)) {
-      presetName.value = names[0] ?? "";
-    }
-  } catch {
-    presetNames.value = [];
+  // If current选项无效，回退到第一个有效名称。
+  if (!names.includes(presetName.value)) {
+    presetName.value = names[0] ?? "";
   }
 }
 
@@ -91,8 +88,8 @@ async function loadSelected(skipRefresh = false) {
     if (!skipRefresh) {
       await refreshNames();
     }
-    const r = await endpoints.promptPresetGet(name);
-    if (r.preset) fromPreset(r.preset);
+    const preset = await presetStore.fetchPromptPreset(name);
+    if (preset) fromPreset(preset);
   } finally {
     busy.value = false;
   }
@@ -106,7 +103,9 @@ async function save() {
   }
   busy.value = true;
   try {
-    await endpoints.promptPresetPut({ name, preset: toPreset() });
+    const preset = toPreset();
+    await endpoints.promptPresetPut({ name, preset });
+    presetStore.rememberPromptPreset(name, preset);
     presetName.value = name;
     await refreshNames();
   } finally {
@@ -122,6 +121,8 @@ async function rename() {
   busy.value = true;
   try {
     await endpoints.promptPresetRename({ from, to });
+    presetStore.evictPromptPreset(from);
+    presetStore.rememberPromptPreset(to, toPreset());
     presetName.value = to;
     await refreshNames();
   } finally {
@@ -136,6 +137,7 @@ async function remove() {
   busy.value = true;
   try {
     await endpoints.promptPresetDelete(name);
+    presetStore.evictPromptPreset(name);
     await refreshNames();
     presetName.value = presetNames.value[0] ?? "";
     await loadSelected(true);

@@ -1,9 +1,7 @@
-use std::path::PathBuf;
-
 use anyhow::Context;
 use nai_core::dto::CharacterPrompt;
 
-use crate::simple_json_store::NameJsonStore;
+use crate::{db::Database, simple_json_store::NameJsonStore};
 
 pub const DEFAULT_PROMPT_PRESET_NAME: &str = "默认";
 
@@ -22,9 +20,9 @@ pub struct PromptPresetStore {
 }
 
 impl PromptPresetStore {
-    pub fn new(db_path: PathBuf) -> anyhow::Result<Self> {
+    pub fn new(db: Database) -> anyhow::Result<Self> {
         Ok(Self {
-            inner: NameJsonStore::new(db_path, "prompt_presets")?,
+            inner: NameJsonStore::new(db, "prompt_presets")?,
         })
     }
 

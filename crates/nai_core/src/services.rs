@@ -1,10 +1,11 @@
 use rand::Rng;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::{
     config::AppConfig,
     dto::{
-        BaseGenerateRequest, CharacterRequest, DirectorResponse, GenerateResponse, Img2ImgRequest, InpaintRequest,
+        BaseGenerateRequest, CharacterRequest, DirectorResponse, GenerateResponse, Img2ImgRequest,
+        InpaintRequest,
     },
     nai::NaiApi,
     outputs::OutputStore,
@@ -42,12 +43,14 @@ fn uc_preset_id(model: &str, preset: &str) -> i32 {
             "None" => 3,
             _ => 3,
         },
-        "nai-diffusion-furry-3" | "nai-diffusion-4-curated-preview" | "nai-diffusion-4-full" => match preset {
-            "Heavy" => 0,
-            "Light" => 1,
-            "None" => 2,
-            _ => 2,
-        },
+        "nai-diffusion-furry-3" | "nai-diffusion-4-curated-preview" | "nai-diffusion-4-full" => {
+            match preset {
+                "Heavy" => 0,
+                "Light" => 1,
+                "None" => 2,
+                _ => 2,
+            }
+        }
         _ => 0,
     }
 }
@@ -55,9 +58,13 @@ fn uc_preset_id(model: &str, preset: &str) -> i32 {
 fn quality_tags(model: &str) -> &'static str {
     match model {
         "nai-diffusion-4-5-full" => ", very aesthetic, masterpiece, no text",
-        "nai-diffusion-4-5-curated" => ", very aesthetic, masterpiece, no text, -0.8::feet::, rating:general",
+        "nai-diffusion-4-5-curated" => {
+            ", very aesthetic, masterpiece, no text, -0.8::feet::, rating:general"
+        }
         "nai-diffusion-4-full" => ", no text, best quality, very aesthetic, absurdres",
-        "nai-diffusion-4-curated-preview" => ", rating:general, best quality, very aesthetic, absurdres",
+        "nai-diffusion-4-curated-preview" => {
+            ", rating:general, best quality, very aesthetic, absurdres"
+        }
         "nai-diffusion-3" => ", best quality, amazing quality, very aesthetic, absurdres",
         "nai-diffusion-furry-3" => ", {best quality}, {amazing quality}",
         _ => "",
@@ -77,18 +84,12 @@ fn skip_cfg_above_sigma(model: &str) -> f64 {
 
 async fn preprocess_prompts(
     cfg: &AppConfig,
-    outputs: &OutputStore,
+    _outputs: &OutputStore,
     positive: &str,
     negative: &str,
 ) -> anyhow::Result<(String, String)> {
-    let wildcards_root = outputs
-        .root()
-        .parent()
-        .map(|p| p.join("wildcards"))
-        .unwrap_or_else(|| std::path::PathBuf::from("../wildcards"));
-
-    let pos = prompt::replace_wildcards(cfg, &wildcards_root, outputs.root(), positive).await?;
-    let neg = prompt::replace_wildcards(cfg, &wildcards_root, outputs.root(), negative).await?;
+    let pos = prompt::format_str(cfg, positive);
+    let neg = prompt::format_str(cfg, negative);
     Ok((pos, neg))
 }
 
@@ -133,7 +134,9 @@ fn build_text2image_payload(
 
     // noise_schedule rules
     if let Some(ns) = &req.noise_schedule {
-        if (model == "nai-diffusion-3" || model == "nai-diffusion-furry-3") && req.sampler == "ddim_v3" {
+        if (model == "nai-diffusion-3" || model == "nai-diffusion-furry-3")
+            && req.sampler == "ddim_v3"
+        {
             // omit
         } else {
             v["parameters"]["noise_schedule"] = json!(ns);
@@ -265,7 +268,8 @@ fn apply_character_reference(
     style_aware: bool,
     fidelity: f32,
 ) {
-    json_data["parameters"]["director_reference_images"] = json!([character_reference_image_base64]);
+    json_data["parameters"]["director_reference_images"] =
+        json!([character_reference_image_base64]);
     json_data["parameters"]["director_reference_descriptions"] = json!([
         {
             "caption": {
@@ -277,7 +281,8 @@ fn apply_character_reference(
     ]);
     json_data["parameters"]["director_reference_information_extracted"] = json!([1]);
     json_data["parameters"]["director_reference_strength_values"] = json!([1]);
-    json_data["parameters"]["director_reference_secondary_strength_values"] = json!([1.0 - fidelity]);
+    json_data["parameters"]["director_reference_secondary_strength_values"] =
+        json!([1.0 - fidelity]);
 }
 
 pub async fn generate_t2i(
@@ -295,12 +300,24 @@ pub async fn generate_t2i(
         pos
     };
 
-    let uc_preset = uc_preset_id(&req.model, req.undesired_content_preset.as_deref().unwrap_or("None"));
+    let uc_preset = uc_preset_id(
+        &req.model,
+        req.undesired_content_preset.as_deref().unwrap_or("None"),
+    );
     let cfg_rescale = req.cfg_rescale.unwrap_or(0.0);
     let use_coords = req.use_coords.unwrap_or(true);
     let legacy_uc = req.legacy_uc.unwrap_or(false);
 
-    let json_data = build_text2image_payload(&req, seed, &pos, &neg, uc_preset, cfg_rescale, use_coords, legacy_uc);
+    let json_data = build_text2image_payload(
+        &req,
+        seed,
+        &pos,
+        &neg,
+        uc_preset,
+        cfg_rescale,
+        use_coords,
+        legacy_uc,
+    );
     let zip_bytes = nai.generate_image_zip(&json_data).await?;
     let png = nai.zip_read_file(&zip_bytes, "image_0.png")?;
     let output_path = outputs.save_png("text2image", seed, &png).await?;
@@ -319,13 +336,29 @@ pub async fn generate_i2i(
     req: Img2ImgRequest,
 ) -> anyhow::Result<GenerateResponse> {
     let seed = normalize_seed(req.base.seed);
-    let (pos, neg) = preprocess_prompts(cfg, outputs, &req.base.positive, &req.base.negative).await?;
-    let uc_preset = uc_preset_id(&req.base.model, req.base.undesired_content_preset.as_deref().unwrap_or("None"));
+    let (pos, neg) =
+        preprocess_prompts(cfg, outputs, &req.base.positive, &req.base.negative).await?;
+    let uc_preset = uc_preset_id(
+        &req.base.model,
+        req.base
+            .undesired_content_preset
+            .as_deref()
+            .unwrap_or("None"),
+    );
     let cfg_rescale = req.base.cfg_rescale.unwrap_or(0.0);
     let use_coords = req.base.use_coords.unwrap_or(true);
     let legacy_uc = req.base.legacy_uc.unwrap_or(false);
 
-    let mut json_data = build_text2image_payload(&req.base, seed, &pos, &neg, uc_preset, cfg_rescale, use_coords, legacy_uc);
+    let mut json_data = build_text2image_payload(
+        &req.base,
+        seed,
+        &pos,
+        &neg,
+        uc_preset,
+        cfg_rescale,
+        use_coords,
+        legacy_uc,
+    );
     apply_img2img(
         &mut json_data,
         req.strength,
@@ -353,13 +386,29 @@ pub async fn generate_inpaint(
     req: InpaintRequest,
 ) -> anyhow::Result<GenerateResponse> {
     let seed = normalize_seed(req.base.seed);
-    let (pos, neg) = preprocess_prompts(cfg, outputs, &req.base.positive, &req.base.negative).await?;
-    let uc_preset = uc_preset_id(&req.base.model, req.base.undesired_content_preset.as_deref().unwrap_or("None"));
+    let (pos, neg) =
+        preprocess_prompts(cfg, outputs, &req.base.positive, &req.base.negative).await?;
+    let uc_preset = uc_preset_id(
+        &req.base.model,
+        req.base
+            .undesired_content_preset
+            .as_deref()
+            .unwrap_or("None"),
+    );
     let cfg_rescale = req.base.cfg_rescale.unwrap_or(0.0);
     let use_coords = req.base.use_coords.unwrap_or(true);
     let legacy_uc = req.base.legacy_uc.unwrap_or(false);
 
-    let mut json_data = build_text2image_payload(&req.base, seed, &pos, &neg, uc_preset, cfg_rescale, use_coords, legacy_uc);
+    let mut json_data = build_text2image_payload(
+        &req.base,
+        seed,
+        &pos,
+        &neg,
+        uc_preset,
+        cfg_rescale,
+        use_coords,
+        legacy_uc,
+    );
     apply_inpaint(
         &mut json_data,
         &req.base.model,
@@ -389,8 +438,15 @@ pub async fn generate_character(
     req: CharacterRequest,
 ) -> anyhow::Result<GenerateResponse> {
     let seed = normalize_seed(req.base.seed);
-    let (pos, neg) = preprocess_prompts(cfg, outputs, &req.base.positive, &req.base.negative).await?;
-    let uc_preset = uc_preset_id(&req.base.model, req.base.undesired_content_preset.as_deref().unwrap_or("None"));
+    let (pos, neg) =
+        preprocess_prompts(cfg, outputs, &req.base.positive, &req.base.negative).await?;
+    let uc_preset = uc_preset_id(
+        &req.base.model,
+        req.base
+            .undesired_content_preset
+            .as_deref()
+            .unwrap_or("None"),
+    );
     let cfg_rescale = req.base.cfg_rescale.unwrap_or(0.0);
     let use_coords = req.base.use_coords.unwrap_or(true);
     let legacy_uc = req.base.legacy_uc.unwrap_or(false);
@@ -399,7 +455,16 @@ pub async fn generate_character(
         anyhow::bail!("character currently supported only for nai-diffusion-4-5-full/curated");
     }
 
-    let mut json_data = build_text2image_payload(&req.base, seed, &pos, &neg, uc_preset, cfg_rescale, use_coords, legacy_uc);
+    let mut json_data = build_text2image_payload(
+        &req.base,
+        seed,
+        &pos,
+        &neg,
+        uc_preset,
+        cfg_rescale,
+        use_coords,
+        legacy_uc,
+    );
     apply_character_reference(
         &mut json_data,
         &req.character_reference_image_base64,
@@ -428,19 +493,30 @@ pub async fn director_call(
 
     let mut paths = Vec::new();
     if is_bg_removal {
-        for (idx, name) in ["image_0.png", "image_1.png", "image_2.png"].into_iter().enumerate() {
+        for (idx, name) in ["image_0.png", "image_1.png", "image_2.png"]
+            .into_iter()
+            .enumerate()
+        {
             if let Ok(png) = nai.zip_read_file(&zip_bytes, name) {
                 let path = outputs
-                    .save_png(&format!("director/remove_bg/{idx}"), rand::random::<u64>(), &png)
+                    .save_png(
+                        &format!("director/remove_bg/{idx}"),
+                        rand::random::<u64>(),
+                        &png,
+                    )
                     .await?;
                 paths.push(path);
             }
         }
     } else {
         let png = nai.zip_read_file(&zip_bytes, "image_0.png")?;
-        let path = outputs.save_png("director", rand::random::<u64>(), &png).await?;
+        let path = outputs
+            .save_png("director", rand::random::<u64>(), &png)
+            .await?;
         paths.push(path);
     }
 
-    Ok(DirectorResponse { output_paths: paths })
+    Ok(DirectorResponse {
+        output_paths: paths,
+    })
 }
