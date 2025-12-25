@@ -4,6 +4,7 @@ FROM node:20-bookworm-slim AS frontend
 WORKDIR /web
 ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
+ENV PNPM_ALLOW_SCRIPTS=esbuild
 RUN corepack enable
 
 # Build frontend with relative API base (use same host)

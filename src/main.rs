@@ -8,7 +8,7 @@ use nai_core::{config::AppConfig, job::JobStore, outputs::OutputStore};
 use nai_nai::NaiClient;
 use tokio::net::TcpListener;
 use tokio::sync::Semaphore;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::trace::TraceLayer;
 use tracing::info;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -76,6 +76,7 @@ async fn main() -> anyhow::Result<()> {
 
     #[cfg(debug_assertions)]
     {
+        use tower_http::cors::CorsLayer;
         app = nai_api::router(state.clone())
             .layer(TraceLayer::new_for_http())
             .layer(CorsLayer::permissive());
