@@ -11,8 +11,10 @@ const metaStore = useMetaStore();
 const health = ref<Health | null>(null);
 const anlas = ref<Anlas | null>(null);
 const errorText = ref<string>("");
+const loading = ref(false);
 
 async function refresh() {
+  loading.value = true;
   errorText.value = "";
   try {
     await metaStore.ensureLoaded();
@@ -20,6 +22,8 @@ async function refresh() {
     anlas.value = await endpoints.anlas();
   } catch (e) {
     errorText.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -29,7 +33,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageShell title="控制台" subtitle="后端状态与快速入口" max-width="lg">
+  <PageShell
+    title="控制台"
+    subtitle="后端状态与快速入口"
+    max-width="lg"
+    :loading="loading"
+    loading-text="加载中"
+  >
     <template #actions>
       <button class="btn btn-primary" @click="refresh">刷新</button>
     </template>

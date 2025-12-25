@@ -43,21 +43,33 @@ watch(categories, (cats) => {
 });
 
 function parseIndex(name: string): number {
-  // 仅按文件名末尾数字排序，老格式无编号则置为 -1
-  const match = name.match(/(\d+)(?=\.[^.]+$)/);
-  if (!match) return -1;
-  const n = Number.parseInt(match[1], 10);
-  return Number.isNaN(n) ? -1 : n;
+  // 优先取文件名前缀的编号（00011_xxx.png）; 若无前缀再回退末尾数字。
+  const base = name.replace(/\.[^.]+$/, "");
+  const leading = base.match(/^(\d{1,})/);
+  if (leading?.[1]) {
+    const n = Number.parseInt(leading[1], 10);
+    if (!Number.isNaN(n)) return n;
+  }
+  const trailing = base.match(/(\d+)(?!.*\d)/);
+  if (trailing?.[1]) {
+    const n = Number.parseInt(trailing[1], 10);
+    if (!Number.isNaN(n)) return n;
+  }
+  return -1;
 }
 
 const tabItems = computed(() => {
   const filtered = items.value.filter(
     (it) => !activeTab.value || it.op_type === activeTab.value
   );
-  return filtered
-    .slice()
-    .sort((a, b) => parseIndex(b.filename) - parseIndex(a.filename))
-    .sort((a, b) => b.date.localeCompare(a.date));
+  return filtered.slice().sort((a, b) => {
+    const dateCmp = b.date.localeCompare(a.date);
+    if (dateCmp !== 0) return dateCmp;
+    const bi = parseIndex(b.filename);
+    const ai = parseIndex(a.filename);
+    if (bi !== ai) return bi - ai;
+    return b.filename.localeCompare(a.filename);
+  });
 });
 
 const dateGroups = computed(() => {
@@ -298,6 +310,8 @@ watch(items, () => {
     openAction.value = null;
   }
 });
+
+const pageLocked = computed(() => loading.value || loadingMore.value);
 </script>
 
 <template>
@@ -305,6 +319,8 @@ watch(items, () => {
     title="输出列表"
     subtitle="按类型分栏，按时间倒序查看"
     max-width="2xl"
+    :loading="pageLocked"
+    loading-text="加载中"
   >
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-2">

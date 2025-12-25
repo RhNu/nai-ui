@@ -160,7 +160,7 @@ function insertIntoTextArea(
 }
 
 function insertSnippet(name: string, targetKey?: string) {
-  const token = `<snippet:${name}>`;
+  const token = `<snippet:${name}>, `;
   const pickedTarget = targetKey
     ? targetOptions.value.find((o) => o.key === targetKey)?.target
     : null;

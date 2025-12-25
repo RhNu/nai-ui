@@ -66,6 +66,7 @@ async fn t2i(
     Json(req): Json<BaseGenerateRequest>,
 ) -> ApiResult<GenerateResponse> {
     let mut req = req;
+    let raw_req = req.clone();
     apply_snippets_to_base(&state, &mut req).await?;
     info!(
         model = %req.model,
@@ -76,7 +77,7 @@ async fn t2i(
         "generate t2i"
     );
 
-    if let Err(e) = state.last_generation.set_from_base(&req).await {
+    if let Err(e) = state.last_generation.set_from_base(&raw_req).await {
         warn!(error = %e, "failed to cache last_generation");
     }
 
@@ -91,6 +92,7 @@ async fn i2i(
     Json(req): Json<Img2ImgRequest>,
 ) -> ApiResult<GenerateResponse> {
     let mut req = req;
+    let raw_base = req.base.clone();
     apply_snippets_to_base(&state, &mut req.base).await?;
     info!(
         model = %req.base.model,
@@ -101,7 +103,7 @@ async fn i2i(
         "generate i2i"
     );
 
-    if let Err(e) = state.last_generation.set_from_base(&req.base).await {
+    if let Err(e) = state.last_generation.set_from_base(&raw_base).await {
         warn!(error = %e, "failed to cache last_generation");
     }
 
@@ -116,6 +118,7 @@ async fn inpaint(
     Json(req): Json<InpaintRequest>,
 ) -> ApiResult<GenerateResponse> {
     let mut req = req;
+    let raw_base = req.base.clone();
     apply_snippets_to_base(&state, &mut req.base).await?;
     info!(
         model = %req.base.model,
@@ -126,7 +129,7 @@ async fn inpaint(
         "generate inpaint"
     );
 
-    if let Err(e) = state.last_generation.set_from_base(&req.base).await {
+    if let Err(e) = state.last_generation.set_from_base(&raw_base).await {
         warn!(error = %e, "failed to cache last_generation");
     }
 
@@ -141,6 +144,7 @@ async fn character(
     Json(req): Json<CharacterRequest>,
 ) -> ApiResult<GenerateResponse> {
     let mut req = req;
+    let raw_base = req.base.clone();
     apply_snippets_to_base(&state, &mut req.base).await?;
     info!(
         model = %req.base.model,
@@ -152,7 +156,7 @@ async fn character(
         "generate character"
     );
 
-    if let Err(e) = state.last_generation.set_from_base(&req.base).await {
+    if let Err(e) = state.last_generation.set_from_base(&raw_base).await {
         warn!(error = %e, "failed to cache last_generation");
     }
 

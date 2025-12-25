@@ -99,6 +99,8 @@ async function run() {
     title="导演"
     subtitle="图像增强 / 处理（augment-image）"
     max-width="2xl"
+    :loading="loading"
+    loading-text="处理中"
   >
     <template #actions>
       <RouterLink class="btn btn-outline btn-sm" to="/outputs"

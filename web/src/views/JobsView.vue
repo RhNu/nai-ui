@@ -13,6 +13,7 @@ type JobTiming = {
 };
 
 const jobs = useJobsStore();
+const loading = ref(false);
 
 const intervalSeconds = ref(jobs.pollingIntervalMs / 1000);
 const pollingProgress = ref(0);
@@ -43,7 +44,12 @@ const jobTimings = computed<Map<string, JobTiming>>(() => {
 });
 
 async function refreshAll() {
-  await jobs.refreshAll();
+  loading.value = true;
+  try {
+    await jobs.refreshAll();
+  } finally {
+    loading.value = false;
+  }
 }
 const { pause: pauseNowTicker, resume: resumeNowTicker } = useIntervalFn(
   () => {
@@ -179,6 +185,8 @@ onUnmounted(() => {
     title="任务"
     subtitle="可配置自动/手动轮询生成队列状态"
     max-width="2xl"
+    :loading="loading"
+    loading-text="加载中"
   >
     <template #actions>
       <div class="flex flex-wrap items-center gap-3">

@@ -137,8 +137,9 @@ async fn job_t2i(
     Json(req): Json<BaseGenerateRequest>,
 ) -> ApiResult<JobSubmitResponse> {
     let mut req = req;
+    let raw_req = req.clone();
     apply_snippets_to_base(&state, &mut req).await?;
-    if let Err(e) = state.last_generation.set_from_base(&req).await {
+    if let Err(e) = state.last_generation.set_from_base(&raw_req).await {
         warn!(error = %e, "failed to cache last_generation");
     }
     submit_job(
@@ -154,8 +155,9 @@ async fn job_i2i(
     Json(req): Json<Img2ImgRequest>,
 ) -> ApiResult<JobSubmitResponse> {
     let mut req = req;
+    let raw_base = req.base.clone();
     apply_snippets_to_base(&state, &mut req.base).await?;
-    if let Err(e) = state.last_generation.set_from_base(&req.base).await {
+    if let Err(e) = state.last_generation.set_from_base(&raw_base).await {
         warn!(error = %e, "failed to cache last_generation");
     }
     submit_job(
@@ -171,8 +173,9 @@ async fn job_inpaint(
     Json(req): Json<InpaintRequest>,
 ) -> ApiResult<JobSubmitResponse> {
     let mut req = req;
+    let raw_base = req.base.clone();
     apply_snippets_to_base(&state, &mut req.base).await?;
-    if let Err(e) = state.last_generation.set_from_base(&req.base).await {
+    if let Err(e) = state.last_generation.set_from_base(&raw_base).await {
         warn!(error = %e, "failed to cache last_generation");
     }
     submit_job(
@@ -188,8 +191,9 @@ async fn job_character(
     Json(req): Json<CharacterRequest>,
 ) -> ApiResult<JobSubmitResponse> {
     let mut req = req;
+    let raw_base = req.base.clone();
     apply_snippets_to_base(&state, &mut req.base).await?;
-    if let Err(e) = state.last_generation.set_from_base(&req.base).await {
+    if let Err(e) = state.last_generation.set_from_base(&raw_base).await {
         warn!(error = %e, "failed to cache last_generation");
     }
     submit_job(

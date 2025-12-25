@@ -7,6 +7,8 @@ const props = defineProps<{
   title: string;
   subtitle?: string;
   maxWidth?: MaxWidth;
+  loading?: boolean;
+  loadingText?: string;
 }>();
 
 const widthClass = computed(() => {
@@ -22,7 +24,7 @@ const widthClass = computed(() => {
 <template>
   <section class="page-shell py-6 sm:py-8">
     <div :class="['mx-auto w-full px-4 sm:px-6 lg:px-8', widthClass]">
-      <div class="flex flex-col gap-4">
+      <div class="relative flex flex-col gap-4">
         <header class="flex flex-wrap items-start justify-between gap-3">
           <div class="space-y-1">
             <p
@@ -51,10 +53,20 @@ const widthClass = computed(() => {
         </div>
 
         <div
-          class="rounded-2xl border border-base-300/70 bg-base-100/90 shadow-2xl backdrop-blur"
+          class="relative rounded-2xl border border-base-300/70 bg-base-100/90 shadow-2xl backdrop-blur"
         >
           <div class="p-4 sm:p-6 lg:p-8">
             <slot />
+          </div>
+        </div>
+
+        <div
+          v-if="props.loading"
+          class="absolute inset-0 z-30 flex items-center justify-center rounded-2xl bg-base-100/80 backdrop-blur-sm"
+        >
+          <div class="flex items-center gap-3 text-sm text-base-content/80">
+            <span class="loading loading-spinner" />
+            <span>{{ props.loadingText || "加载中，请稍候…" }}</span>
           </div>
         </div>
       </div>
