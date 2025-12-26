@@ -81,22 +81,27 @@ defineExpose({
 </template>
 
 <style scoped>
-.prompt-bracket {
+:deep(.prompt-bracket) {
   color: var(--prompt-highlight-neutral, #6b7280);
 }
 
-.prompt-mix-sep {
+:deep(.prompt-mix-sep) {
   color: var(--prompt-highlight-neutral, #6b7280);
 }
 
-.prompt-weight-close {
+:deep(.prompt-weight-close) {
   color: var(--prompt-highlight-colon, #16a34a);
   font-weight: 600;
 }
 
-.prompt-random,
-.prompt-random-sep {
+:deep(.prompt-random),
+:deep(.prompt-random-sep) {
   color: var(--prompt-highlight-colon, #16a34a);
   font-weight: 600;
+}
+
+:deep(.prompt-snippet) {
+  color: var(--prompt-highlight-colon, #16a34a);
+  font-weight: 700;
 }
 </style>

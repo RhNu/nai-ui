@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 
 import HomeView from "@/views/HomeView.vue";
+import MetadataView from "@/views/MetadataView.vue";
 import GenerateT2IView from "@/views/generate/GenerateT2IView.vue";
 import GenerateI2IView from "@/views/generate/GenerateI2IView.vue";
 import GenerateInpaintView from "@/views/generate/GenerateInpaintView.vue";
@@ -66,5 +67,6 @@ export const router = createRouter({
     { path: "/director", name: "director", component: DirectorView },
     { path: "/jobs", name: "jobs", component: JobsView },
     { path: "/outputs", name: "outputs", component: OutputsView },
+    { path: "/metadata", name: "metadata", component: MetadataView },
   ],
 });

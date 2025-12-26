@@ -4,25 +4,30 @@ export type WeightHighlightConfig = {
   upHue: number;
   downHue: number;
   saturation: number;
+  saturationBoost: number;
   baseLightness: number;
   lightnessDelta: number;
+  intensityExponent: number;
   neutralColor: string;
   colonColor: string;
 };
 
 export const defaultHighlightConfig: WeightHighlightConfig = {
   parenthesisBoost: 1.1,
-  maxDeltaForIntensity: 2.5,
-  upHue: 0,
-  downHue: 215,
-  saturation: 72,
-  baseLightness: 52,
-  lightnessDelta: 16,
+  maxDeltaForIntensity: 3,
+  upHue: 12,
+  downHue: 208,
+  saturation: 68,
+  saturationBoost: 18,
+  baseLightness: 56,
+  lightnessDelta: 26,
+  intensityExponent: 0.7,
   neutralColor: "#6b7280",
   colonColor: "#16a34a",
 };
 
 const numericWeightPattern = /^[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?=::)/;
+const snippetPattern = /^<\s*snippet:([^>\s]+)\s*>/i;
 // Only treat bracketed/brace groups with :number as weighted; avoid plain colon tags (e.g., artist:foo).
 const explicitGroupPattern =
   /^(\[|\{)([^()\[\]{}]+?):\s*(-?\d+(?:\.\d+)?)(\]|\})/;
@@ -37,10 +42,12 @@ function escapeHtml(input: string): string {
 function weightToColor(weight: number, config: WeightHighlightConfig): string {
   if (!Number.isFinite(weight) || weight === 1) return "";
   const delta = Math.min(Math.abs(weight - 1), config.maxDeltaForIntensity);
-  const intensity = Math.min(delta / config.maxDeltaForIntensity, 1);
+  const normalized = Math.min(delta / config.maxDeltaForIntensity, 1);
+  const intensity = Math.pow(normalized, config.intensityExponent);
   const hue = weight > 1 ? config.upHue : config.downHue;
   const lightness = config.baseLightness - intensity * config.lightnessDelta;
-  return `hsl(${hue}, ${config.saturation}%, ${lightness}%)`;
+  const saturation = config.saturation + intensity * config.saturationBoost;
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 
 function wrap(
@@ -105,6 +112,16 @@ function renderSegment(
     wrap(segment, weight * factor, config);
 
   while (i < text.length) {
+    if (text[i] === "<") {
+      const snippetMatch = text.slice(i).match(snippetPattern);
+      if (snippetMatch) {
+        const [full] = snippetMatch;
+        out.push(`<span class="prompt-snippet">${escapeHtml(full)}</span>`);
+        i += full.length;
+        continue;
+      }
+    }
+
     if (text.startsWith("||", i)) {
       const close = text.indexOf("||", i + 2);
       if (close !== -1) {

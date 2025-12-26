@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from "vue";
 import { endpoints } from "@/api/endpoints";
 import type { PromptSnippet, PromptSnippetSummary } from "@/api/types";
+import WeightedPromptInput from "../form/WeightedPromptInput.vue";
 
 const snippetName = ref("");
 const snippets = ref<PromptSnippetSummary[]>([]);
@@ -205,10 +206,11 @@ void refreshList().then(() => loadSelected(true));
 
     <fieldset class="fieldset">
       <legend class="fieldset-legend">片段内容</legend>
-      <textarea
+      <WeightedPromptInput
         v-model="form.body"
-        class="textarea textarea-bordered h-48 w-full"
+        :rows="8"
         placeholder="可使用 <snippet:名称> 继续嵌套"
+        :disabled="busy"
       />
     </fieldset>
   </div>
