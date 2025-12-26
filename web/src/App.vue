@@ -15,14 +15,14 @@ const navLinks = [
   },
   {
     label: "预设",
-    to: "/presets/generate",
+    to: "/presets/snippet",
     match: "/presets",
     icon: "fa-layer-group",
   },
   { label: "导演", to: "/director", icon: "fa-clapperboard" },
   { label: "任务", to: "/jobs", icon: "fa-list-check" },
   { label: "输出", to: "/outputs", icon: "fa-images" },
-  { label: "元数据", to: "/metadata", icon: "fa-file-circle-info" },
+  { label: "元数据", to: "/metadata", icon: "fa-circle-info" },
 ];
 
 const themeIcon = computed(() => ({
