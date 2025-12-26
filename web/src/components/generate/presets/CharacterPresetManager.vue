@@ -8,6 +8,7 @@ import {
   positionToCenter,
 } from "@/composables/useCharacterPosition";
 import type { CharacterSlotPreset } from "@/api/types";
+import WeightedPromptInput from "../form/WeightedPromptInput.vue";
 
 const presetStore = usePresetStore();
 const busy = ref(false);
@@ -194,18 +195,20 @@ void refreshNames();
 
       <fieldset class="fieldset lg:col-span-3">
         <legend class="fieldset-legend">正向（角色）</legend>
-        <textarea
+        <WeightedPromptInput
           v-model="working.prompt"
-          class="textarea textarea-bordered h-28 w-full"
+          :rows="5"
+          placeholder="角色正向提示词"
           :disabled="busy"
         />
       </fieldset>
 
       <fieldset class="fieldset lg:col-span-3">
         <legend class="fieldset-legend">反向（角色）</legend>
-        <textarea
+        <WeightedPromptInput
           v-model="working.uc"
-          class="textarea textarea-bordered h-28 w-full"
+          :rows="5"
+          placeholder="角色反向提示词"
           :disabled="busy"
         />
       </fieldset>

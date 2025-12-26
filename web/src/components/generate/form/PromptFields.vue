@@ -6,6 +6,7 @@ import type {
   PromptSnippetPreviewResponse,
   PromptSnippetSummary,
 } from "@/api/types";
+import WeightedPromptInput from "./WeightedPromptInput.vue";
 
 type SnippetTarget =
   | { type: "positive" }
@@ -29,8 +30,13 @@ const props = defineProps<{
   form: BaseGenerateRequest;
 }>();
 
-const positiveRef = ref<HTMLTextAreaElement | null>(null);
-const negativeRef = ref<HTMLTextAreaElement | null>(null);
+type WeightedPromptInputExpose = {
+  textareaEl?: { value: HTMLTextAreaElement | null };
+  getTextarea?: () => HTMLTextAreaElement | null;
+};
+
+const positiveInputRef = ref<WeightedPromptInputExpose | null>(null);
+const negativeInputRef = ref<WeightedPromptInputExpose | null>(null);
 
 const snippetQuery = ref("");
 const snippetTag = ref("");
@@ -168,7 +174,9 @@ function insertSnippet(name: string, targetKey?: string) {
 
   if (target.type === "positive") {
     insertIntoTextArea(
-      positiveRef.value,
+      positiveInputRef.value?.getTextarea?.() ??
+        positiveInputRef.value?.textareaEl?.value ??
+        null,
       props.form.positive,
       (v) => (props.form.positive = v),
       token
@@ -179,7 +187,9 @@ function insertSnippet(name: string, targetKey?: string) {
 
   if (target.type === "negative") {
     insertIntoTextArea(
-      negativeRef.value,
+      negativeInputRef.value?.getTextarea?.() ??
+        negativeInputRef.value?.textareaEl?.value ??
+        null,
       props.form.negative,
       (v) => (props.form.negative = v),
       token
@@ -299,10 +309,10 @@ onBeforeUnmount(() => {
 
         <fieldset class="fieldset">
           <legend class="fieldset-legend">正向提示词</legend>
-          <textarea
-            ref="positiveRef"
+          <WeightedPromptInput
+            ref="positiveInputRef"
             v-model="props.form.positive"
-            class="textarea textarea-bordered h-28 w-full"
+            :rows="6"
             placeholder="positive prompt"
             @focus="activeTargetKey = 'positive'"
           />
@@ -310,10 +320,10 @@ onBeforeUnmount(() => {
 
         <fieldset class="fieldset">
           <legend class="fieldset-legend">反向提示词</legend>
-          <textarea
-            ref="negativeRef"
+          <WeightedPromptInput
+            ref="negativeInputRef"
             v-model="props.form.negative"
-            class="textarea textarea-bordered h-28 w-full"
+            :rows="6"
             placeholder="negative prompt"
             @focus="activeTargetKey = 'negative'"
           />
