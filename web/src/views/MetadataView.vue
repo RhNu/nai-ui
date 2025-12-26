@@ -80,7 +80,7 @@ async function inflate(data: Uint8Array): Promise<Uint8Array> {
   if (typeof DecompressionStream === "undefined") {
     throw new Error("浏览器缺少 DecompressionStream，无法解压 zTXt / iTXt");
   }
-  const stream = new Blob([data])
+  const stream = new Blob([data.slice()])
     .stream()
     .pipeThrough(new DecompressionStream("deflate"));
   const buffer = await new Response(stream).arrayBuffer();
@@ -139,7 +139,7 @@ async function parseITxtChunk(
     if (compressionMethod !== 0) {
       throw new Error(`未知压缩方式 ${compressionMethod}`);
     }
-    textBytes = await inflate(textBytes);
+    textBytes = (await inflate(textBytes)) as Uint8Array<ArrayBuffer>;
   }
   return { key: keyword, value: decodeString(textBytes) };
 }
@@ -468,7 +468,7 @@ async function parseFromClipboard() {
                       </div>
                     </div>
                     <pre
-                      class="mt-2 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed"
+                      class="mt-2 whitespace-pre-wrap wrap-break-word font-mono text-xs leading-relaxed"
                       >{{ item.parameters }}</pre
                     >
                   </div>
@@ -500,12 +500,12 @@ async function parseFromClipboard() {
                         </div>
                         <pre
                           v-if="entry.json"
-                          class="mt-1 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed"
+                          class="mt-1 whitespace-pre-wrap wrap-break-word font-mono text-xs leading-relaxed"
                           >{{ entry.json }}</pre
                         >
                         <pre
                           v-else
-                          class="mt-1 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed"
+                          class="mt-1 whitespace-pre-wrap wrap-break-word font-mono text-xs leading-relaxed"
                           >{{ entry.value }}</pre
                         >
                       </div>
